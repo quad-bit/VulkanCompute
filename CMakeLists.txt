@@ -20,8 +20,13 @@ find_package(glfw3 3.3 REQUIRED)
 
 set(CORE_FILES
     inc/VulkanManager.h
+    inc/WindowManager.h
+    inc/ValidationManager.h
 
     src/VulkanManager.cpp
+    src/ValidationManager.cpp
+    src/WindowManager.cpp
+    
     src/main.cpp
 )
 
@@ -35,6 +40,7 @@ target_include_directories(${TARGET_NAME}
 
 target_compile_definitions(${TARGET_NAME} PUBLIC
     ASSETS_PATH="${ASSETS_PATH}"
+    GLFW_ENABLED
 )
 
 target_link_libraries(${TARGET_NAME} PUBLIC Vulkan::Vulkan glfw glm::glm)
