@@ -1,76 +1,8 @@
 #include "..\inc\VulkanManager.h"
-#include <assert.h>
 #include <vector>
 
 namespace
 {
-    void ErrorCheck(VkResult result)
-    {
-    #ifdef _DEBUG
-        if (result < 0)
-        {
-            switch (result)
-            {
-            case VK_ERROR_OUT_OF_HOST_MEMORY:
-                std::cout << "VK_ERROR_OUT_OF_HOST_MEMORY" << std::endl;
-                break;
-            case VK_ERROR_OUT_OF_DEVICE_MEMORY:
-                std::cout << "VK_ERROR_OUT_OF_DEVICE_MEMORY" << std::endl;
-                break;
-            case VK_ERROR_INITIALIZATION_FAILED:
-                std::cout << "VK_ERROR_INITIALIZATION_FAILED" << std::endl;
-                break;
-            case VK_ERROR_DEVICE_LOST:
-                std::cout << "VK_ERROR_DEVICE_LOST" << std::endl;
-                break;
-            case VK_ERROR_MEMORY_MAP_FAILED:
-                std::cout << "VK_ERROR_MEMORY_MAP_FAILED" << std::endl;
-                break;
-            case VK_ERROR_LAYER_NOT_PRESENT:
-                std::cout << "VK_ERROR_LAYER_NOT_PRESENT" << std::endl;
-                break;
-            case VK_ERROR_EXTENSION_NOT_PRESENT:
-                std::cout << "VK_ERROR_EXTENSION_NOT_PRESENT" << std::endl;
-                break;
-            case VK_ERROR_FEATURE_NOT_PRESENT:
-                std::cout << "VK_ERROR_FEATURE_NOT_PRESENT" << std::endl;
-                break;
-            case VK_ERROR_INCOMPATIBLE_DRIVER:
-                std::cout << "VK_ERROR_INCOMPATIBLE_DRIVER" << std::endl;
-                break;
-            case VK_ERROR_TOO_MANY_OBJECTS:
-                std::cout << "VK_ERROR_TOO_MANY_OBJECTS" << std::endl;
-                break;
-            case VK_ERROR_FORMAT_NOT_SUPPORTED:
-                std::cout << "VK_ERROR_FORMAT_NOT_SUPPORTED" << std::endl;
-                break;
-            case VK_ERROR_SURFACE_LOST_KHR:
-                std::cout << "VK_ERROR_SURFACE_LOST_KHR" << std::endl;
-                break;
-            case VK_ERROR_NATIVE_WINDOW_IN_USE_KHR:
-                std::cout << "VK_ERROR_NATIVE_WINDOW_IN_USE_KHR" << std::endl;
-                break;
-            case VK_SUBOPTIMAL_KHR:
-                std::cout << "VK_SUBOPTIMAL_KHR" << std::endl;
-                break;
-            case VK_ERROR_OUT_OF_DATE_KHR:
-                std::cout << "VK_ERROR_OUT_OF_DATE_KHR" << std::endl;
-                break;
-            case VK_ERROR_INCOMPATIBLE_DISPLAY_KHR:
-                std::cout << "VK_ERROR_INCOMPATIBLE_DISPLAY_KHR" << std::endl;
-                break;
-            case VK_ERROR_VALIDATION_FAILED_EXT:
-                std::cout << "VK_ERROR_VALIDATION_FAILED_EXT" << std::endl;
-                break;
-            default:
-                break;
-            }
-
-            assert(0);
-        }
-    #endif
-    }
-
     std::vector<VkDeviceQueueCreateInfo> FindQueue(const uint32_t & queueFamilyIndex)
     {
         constexpr uint32_t minGraphicQueueRequired = 1, minCopmuteQueueRequired = 1;
@@ -138,7 +70,6 @@ void VulkanManager::CreateLogicalDevice(const uint32_t & queueFamilyIndex)
     vkDeviceCreateInfoObj.pQueueCreateInfos = deviceQueueCreateInfoList.data();
     vkDeviceCreateInfoObj.enabledExtensionCount = (uint32_t)m_validationManagerObj->deviceExtensionNameList.size();
     vkDeviceCreateInfoObj.enabledLayerCount = 0;
-    //vkDeviceCreateInfoObj.pEnabledFeatures = &GfxVk::Utility::VulkanDeviceInfo::m_enabledPhysicalDeviceFeatures;
     vkDeviceCreateInfoObj.ppEnabledExtensionNames = m_validationManagerObj->deviceExtensionNameList.data();
     vkDeviceCreateInfoObj.ppEnabledLayerNames = nullptr;
     vkDeviceCreateInfoObj.pNext = &physicalFeatures2;
@@ -162,16 +93,12 @@ void VulkanManager::GetPhysicalDevice()
 
         if (deviceProp.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) // deviceProp.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU ||
         {
-            //DeviceInfo::m_physicalDeviceObj = dev;
-            //CoreObjects::physicalDeviceObj = &DeviceInfo::m_physicalDeviceObj;
             discreteGpu = dev;
             break;
         }
 
         if (deviceProp.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU)
         {
-            //DeviceInfo::m_physicalDeviceObj = dev;
-            //CoreObjects::physicalDeviceObj = &DeviceInfo::m_physicalDeviceObj;
             integratedGpu = dev;
         }
     }
@@ -270,7 +197,7 @@ VulkanManager::VulkanManager(const uint32_t& screenWidth, const uint32_t& screen
     m_validationManagerObj = std::make_unique<ValidationManager>();
 }
 
-void VulkanManager::Init()
+void VulkanManager::Init(GLFWwindow* glfwWindow)
 {
     CreateInstance();
     GetPhysicalDevice();
@@ -283,15 +210,16 @@ void VulkanManager::Init()
 
     GetMaxUsableVKSampleCount();
     FindBestDepthFormat();
+    CreateSurface(glfwWindow);
+    CreateSwapchain();
 }
 
 void VulkanManager::DeInit()
 {
+    DestroySwapChain();
     vkDestroySurfaceKHR(m_instanceObj, m_surface, nullptr);
     vkDestroyDevice(m_logicalDevice, nullptr);
     m_validationManagerObj->DeinitDebug();
-
-    //VkQueueFactory::GetInstance()->DeInit();
 
     vkDestroyInstance(m_instanceObj, nullptr);
 }
@@ -350,4 +278,92 @@ void VulkanManager::CreateSurface(GLFWwindow * glfwWindow)
             m_surfaceFormat = formats[0];
         }
     }
+}
+
+void VulkanManager::CreateSwapchain()
+{
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_physicalDevice, m_surface, &m_surfaceCapabilities);
+
+    if (m_surfaceCapabilities.maxImageCount > 0)
+        if (m_swapchainImageCount > m_surfaceCapabilities.maxImageCount)
+            m_swapchainImageCount = m_surfaceCapabilities.maxImageCount;
+
+    if (m_swapchainImageCount < m_surfaceCapabilities.minImageCount + 1)
+        m_swapchainImageCount = m_surfaceCapabilities.minImageCount + 1;
+
+    auto presentMode = VkPresentModeKHR::VK_PRESENT_MODE_FIFO_KHR;
+    {
+        uint32_t count = 0;
+        ErrorCheck(vkGetPhysicalDeviceSurfacePresentModesKHR(m_physicalDevice, m_surface, &count, nullptr));
+        std::vector<VkPresentModeKHR> presentModeList(count);
+        ErrorCheck(vkGetPhysicalDeviceSurfacePresentModesKHR(m_physicalDevice, m_surface, &count, presentModeList.data()));
+
+        for (VkPresentModeKHR obj : presentModeList)
+        {
+            if (obj == VK_PRESENT_MODE_MAILBOX_KHR)
+            {
+                presentMode = obj;
+                m_swapchainImageCount = 3;
+                break;
+            }
+        }
+    }
+
+    m_maxFrameInFlight = m_swapchainImageCount - 1;
+
+    VkSwapchainCreateInfoKHR swapChainCreateInfo{};
+    swapChainCreateInfo.clipped = VK_TRUE; // dont render parts of swapchain image that are out of the frustrum
+    swapChainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    swapChainCreateInfo.imageArrayLayers = 1; // 2 meant for sterescopic rendering
+    swapChainCreateInfo.imageColorSpace = m_surfaceFormat.colorSpace;
+    swapChainCreateInfo.imageExtent.height = m_surfaceHeight;
+    swapChainCreateInfo.imageExtent.width = m_surfaceWidth;
+    swapChainCreateInfo.imageFormat = m_surfaceFormat.format;
+    swapChainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    swapChainCreateInfo.imageUsage = VkImageUsageFlagBits::VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    swapChainCreateInfo.minImageCount = m_swapchainImageCount;
+    swapChainCreateInfo.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+    swapChainCreateInfo.presentMode = presentMode;
+    swapChainCreateInfo.oldSwapchain = VK_NULL_HANDLE; // useful when resizing the window
+    swapChainCreateInfo.queueFamilyIndexCount = 0; // as its not shared between multiple queues
+    swapChainCreateInfo.pQueueFamilyIndices = nullptr;
+    swapChainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+    swapChainCreateInfo.surface = m_surface;
+
+    ErrorCheck(vkCreateSwapchainKHR(m_logicalDevice, &swapChainCreateInfo, nullptr, &m_swapchainObj));
+
+    // swapchain images
+    uint32_t count = 0;
+    ErrorCheck(vkGetSwapchainImagesKHR(m_logicalDevice, m_swapchainObj, &count, nullptr));
+    m_swapchainImageList.resize(count);
+    ErrorCheck(vkGetSwapchainImagesKHR(m_logicalDevice, m_swapchainObj, &count, m_swapchainImageList.data()));
+    assert(m_swapchainImageCount == (uint32_t)m_swapchainImageList.size());
+
+    // swapchain image views
+    m_swapChainImageViewList.resize(m_swapchainImageCount);
+    for (uint32_t i = 0; i < m_swapchainImageCount; i++)
+    {
+        VkImageViewCreateInfo createInfo{};
+        createInfo.components = { VK_COMPONENT_SWIZZLE_IDENTITY,VK_COMPONENT_SWIZZLE_IDENTITY,VK_COMPONENT_SWIZZLE_IDENTITY,VK_COMPONENT_SWIZZLE_IDENTITY };
+        createInfo.format = m_surfaceFormat.format;
+        createInfo.image = m_swapchainImageList[i];
+        createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        createInfo.subresourceRange.baseArrayLayer = 0;
+        createInfo.subresourceRange.baseMipLevel = 0;
+        createInfo.subresourceRange.layerCount = 1;
+        createInfo.subresourceRange.levelCount = 1;
+        createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+
+        ErrorCheck(vkCreateImageView(m_logicalDevice, &createInfo, nullptr, &m_swapChainImageViewList[i]));
+    }
+}
+
+void VulkanManager::DestroySwapChain()
+{
+    for (auto& view : m_swapChainImageViewList)
+    {
+        vkDestroyImageView(m_logicalDevice, view, nullptr);
+    }
+    vkDestroySwapchainKHR(m_logicalDevice, m_swapchainObj, nullptr);
 }

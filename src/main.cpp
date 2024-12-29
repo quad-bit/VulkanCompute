@@ -9,8 +9,7 @@ int main()
     windowManagerObj->Init();
 
     std::unique_ptr<VulkanManager> vulkanManager = std::make_unique<VulkanManager>(screenWidth, screenHeight);
-    vulkanManager->Init();
-    vulkanManager->CreateSurface(windowManagerObj->glfwWindow);
+    vulkanManager->Init(windowManagerObj->glfwWindow);
 
     while (windowManagerObj->Update())
     {

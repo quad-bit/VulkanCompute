@@ -1,10 +1,9 @@
 #pragma once
-#include <vulkan/vulkan.h>
-#include <GLFW/glfw3.h>
 #include <memory>
 #include <iostream>
 #include "ValidationManager.h"
 #include "WindowManager.h"
+#include "Utils.h"
 
 class VulkanManager
 {
@@ -29,6 +28,11 @@ private:
     VkSurfaceCapabilitiesKHR m_surfaceCapabilities;
 
     size_t m_surfaceWidth, m_surfaceHeight;
+    uint32_t m_swapchainImageCount = 0;
+    uint32_t m_maxFrameInFlight, m_frameInFlight = 0;
+    VkSwapchainKHR m_swapchainObj = VK_NULL_HANDLE;
+    std::vector<VkImage> m_swapchainImageList;
+    std::vector<VkImageView> m_swapChainImageViewList;
 
     void CreateInstance();
     void GetPhysicalDevice();
@@ -36,14 +40,17 @@ private:
     void CreateLogicalDevice(const uint32_t & queueFamilyIndex);
     void GetMaxUsableVKSampleCount();
     void FindBestDepthFormat();
+    void CreateSurface(GLFWwindow* glfwWindow);
+
+    void CreateSwapchain();
+    void DestroySwapChain();
 
 public:
     ~VulkanManager();
     VulkanManager(const uint32_t& screenWidth, const uint32_t& screenHeight);
 
-    void Init();
+    void Init(GLFWwindow* glfwWindow);
 
     void DeInit();
     void Update();
-    void CreateSurface(GLFWwindow* glfwWindow);
 };
