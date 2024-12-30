@@ -20,12 +20,14 @@ find_package(glfw3 3.3 REQUIRED)
 
 set(CORE_FILES
     inc/VulkanManager.h
+    inc/Utils.h
     inc/WindowManager.h
     inc/ValidationManager.h
 
     src/VulkanManager.cpp
     src/ValidationManager.cpp
     src/WindowManager.cpp
+    src/Utils.cpp
     
     src/main.cpp
 )
