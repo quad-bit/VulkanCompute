@@ -2,6 +2,7 @@
 #include <iostream>
 #include <algorithm>
 #include <optional>
+#include <fstream>
 
 void ErrorCheck(VkResult result)
 {
@@ -182,6 +183,7 @@ std::tuple<VkImage, VkDeviceMemory> CreateImage(const VkDevice & device, const V
     createInfo.usage = usageFlags;
     createInfo.samples = VkSampleCountFlagBits::VK_SAMPLE_COUNT_1_BIT;
     createInfo.sharingMode = VkSharingMode::VK_SHARING_MODE_EXCLUSIVE;
+    createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     ErrorCheck(vkCreateImage(device, &createInfo, nullptr, &image));
 
     VkMemoryRequirements memReq{};
@@ -189,13 +191,16 @@ std::tuple<VkImage, VkDeviceMemory> CreateImage(const VkDevice & device, const V
 
     VkMemoryAllocateInfo memoryAllocInfo = {};
     memoryAllocInfo.allocationSize = memReq.size;
-    memoryAllocInfo.memoryTypeIndex = ([&]() {
+    memoryAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    memoryAllocInfo.memoryTypeIndex = ([&]()
+    {
         // Get memory types supported by the physical device:
         VkPhysicalDeviceMemoryProperties memoryProperties{};
         vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memoryProperties);
 
         // In search for a suitable memory type INDEX:
-        for (uint32_t i = 0u; i < memoryProperties.memoryTypeCount; ++i) {
+        for (uint32_t i = 0u; i < memoryProperties.memoryTypeCount; ++i)
+        {
 
             // Is this kind of memory suitable for our buffer?
             const auto bitmask = memReq.memoryTypeBits;
@@ -249,7 +254,35 @@ void DestroyImageView(const VkDevice & device, VkImageView imageView)
 
 std::tuple<VkShaderModule, VkPipelineShaderStageCreateInfo> CreateShaderModule(const VkDevice & device, const std::string & path, const VkShaderStageFlagBits & shaderStage)
 {
-    return std::tuple<VkShaderModule, VkPipelineShaderStageCreateInfo>();
+    std::ifstream file(path, std::ios::ate | std::ios::binary);
+
+    if (!file.is_open()) {
+        throw std::runtime_error("failed to open file!");
+    }
+
+    size_t fileSize = (size_t)file.tellg();
+    std::vector<char> buffer(fileSize);
+
+    file.seekg(0);
+    file.read(buffer.data(), fileSize);
+
+    file.close();
+
+    VkShaderModuleCreateInfo moduleCreateInfo{};
+    moduleCreateInfo.codeSize = buffer.size();
+    moduleCreateInfo.pCode = reinterpret_cast<const uint32_t*>(buffer.data());
+    moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+
+    VkShaderModule shaderModule = VK_NULL_HANDLE;
+    ErrorCheck(vkCreateShaderModule(device, &moduleCreateInfo, nullptr, &shaderModule));
+
+    VkPipelineShaderStageCreateInfo shaderStageCreateInfo{};
+    shaderStageCreateInfo.stage = shaderStage;
+    shaderStageCreateInfo.module = shaderModule;
+    shaderStageCreateInfo.pName = "main";
+    shaderStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+
+    return std::make_tuple(shaderModule, shaderStageCreateInfo);
 }
 
 void DestroyShaderModule(const VkDevice & device, VkShaderModule shaderModule)
@@ -264,4 +297,85 @@ std::tuple<VkBuffer, VkDeviceMemory> CreateBufferAndMemory(const VkDevice & devi
 
 void CopyDataIntoHostCoherentMemory(const VkDevice & device, const size_t & dataSize, const void * data, VkDeviceMemory & memory)
 {
+}
+
+void ChangeImageLayout(const VkDevice& device, std::vector<VkImage>& imageList, const VkQueue& queue,
+    uint32_t queueFamilyIndex, VkImageLayout oldLayout, VkImageLayout newLayout)
+{
+    VkCommandPool pool = VK_NULL_HANDLE;
+    VkCommandPoolCreateInfo info{};
+    info.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+    info.pNext = nullptr;
+    info.queueFamilyIndex = queueFamilyIndex;
+    info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+
+    ErrorCheck(vkCreateCommandPool(device, &info, nullptr, &pool));
+
+    VkCommandBufferAllocateInfo allocInfo{};
+    allocInfo.commandBufferCount = 1;
+    allocInfo.commandPool = pool;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.pNext = nullptr;
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+
+    VkCommandBuffer cmdBuffer = VK_NULL_HANDLE;
+    ErrorCheck(vkAllocateCommandBuffers(device, &allocInfo, &cmdBuffer));
+
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    beginInfo.pInheritanceInfo = nullptr;
+    beginInfo.pNext = nullptr;
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+    vkBeginCommandBuffer(cmdBuffer, &beginInfo);
+    std::vector<VkImageMemoryBarrier2> list;
+    for (auto& image : imageList)
+    {
+        VkImageMemoryBarrier2 imgBarrier{};
+        imgBarrier.dstAccessMask = 0;
+        imgBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        imgBarrier.dstStageMask = VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT;
+        imgBarrier.image = image;
+        imgBarrier.newLayout = newLayout;
+        imgBarrier.oldLayout = oldLayout;
+        imgBarrier.pNext = nullptr;
+        imgBarrier.srcAccessMask = 0;
+        imgBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        imgBarrier.srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
+        imgBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+        imgBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        imgBarrier.subresourceRange.baseArrayLayer = 0;
+        imgBarrier.subresourceRange.baseMipLevel = 0;
+        imgBarrier.subresourceRange.layerCount = 1;
+        imgBarrier.subresourceRange.levelCount = 1;
+        list.push_back(imgBarrier);
+    }
+
+    VkDependencyInfo dependencyInfo{};
+    dependencyInfo.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+    dependencyInfo.imageMemoryBarrierCount = list.size();
+    dependencyInfo.pImageMemoryBarriers = list.data();
+    dependencyInfo.pNext = nullptr;
+    dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+
+    vkCmdPipelineBarrier2(cmdBuffer, &dependencyInfo);
+    vkEndCommandBuffer(cmdBuffer);
+
+    VkFence fence = VK_NULL_HANDLE;
+    VkFenceCreateInfo fenceInfo{};
+    fenceInfo.pNext = nullptr;
+    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    ErrorCheck(vkCreateFence(device, &fenceInfo, nullptr, &fence));
+
+    VkSubmitInfo submitInfo{};
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &cmdBuffer;
+    submitInfo.pNext = nullptr;
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    ErrorCheck(vkQueueSubmit(queue, 1, &submitInfo, fence));
+
+    ErrorCheck(vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX));
+
+    vkDestroyFence(device, fence, nullptr);
+    vkDestroyCommandPool(device, pool, nullptr);
 }

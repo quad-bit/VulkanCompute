@@ -35,7 +35,7 @@ private:
     std::vector<VkImageView> m_swapChainImageViewList;
  
     void CreateInstance();
-    void GetPhysicalDevice();
+    void AcquirePhysicalDevice();
     uint32_t GetQueuesFamilyIndex();
     void CreateLogicalDevice(const uint32_t & queueFamilyIndex);
     void GetMaxUsableVKSampleCount();
@@ -45,9 +45,10 @@ private:
     void CreateSwapchain();
     void DestroySwapChain();
 
-    std::vector<VkFence> m_acquireImageFence;
-    VkSemaphore m_cpuWaitSemaphore;
     std::vector<VkSemaphore> m_renderingCompletedSignalSemaphore;
+
+    VkCommandPool m_commandPool;
+    std::vector<VkCommandBuffer> m_commandBuffers;
 
 public:
     ~VulkanManager();
@@ -55,13 +56,18 @@ public:
 
     void Init(GLFWwindow* glfwWindow);
 
-    void DeInit(std::vector<VkSemaphore> destroySemaphoreList);
+    void DeInit();
     void Update(uint32_t currentFrameIndex);
     uint32_t GetSwapchainImageCount() const;
     uint32_t GetFrameInFlightIndex() const;
     uint32_t GetMaxFramesInFlight() const;
     const VkDevice& GetLogicalDevice() const;
-    std::tuple<uint32_t, VkFence> GetActiveSwapchainImageIndex(const VkSemaphore& imageAquiredSignalSemaphore);
+    const VkPhysicalDevice& GetPhysicalDevice() const;
+    uint32_t GetQueueFamilyIndex() const;
+    uint32_t GetActiveSwapchainImageIndex(const VkSemaphore& imageAquiredSignalSemaphore);
+    const VkQueue& GetComputeQueue() const;
+    const VkQueue& GetGraphicsQueue() const;
 
-    void CopyAndPresent(const VkImage& srcImage, const VkSemaphore& waitSemaphore, const VkFence& acquireFence);
+    void CopyAndPresent(const VkImage& srcImage, TimelineSemaphore& semaphore, const VkSemaphore& imageAcquiredSemaphore);
+    bool AreTheQueuesIdle();
 };

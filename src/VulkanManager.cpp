@@ -1,5 +1,7 @@
 #include "..\inc\VulkanManager.h"
 #include <vector>
+#include <array>
+#include "Utils.h"
 
 namespace
 {
@@ -162,7 +164,7 @@ void VulkanManager::CreateLogicalDevice(const uint32_t & queueFamilyIndex)
     ErrorCheck(vkCreateDevice(m_physicalDevice, &vkDeviceCreateInfoObj, nullptr, &m_logicalDevice));
 }
 
-void VulkanManager::GetPhysicalDevice()
+void VulkanManager::AcquirePhysicalDevice()
 {
     uint32_t count = 0;
     vkEnumeratePhysicalDevices(m_instanceObj, &count, nullptr);
@@ -285,7 +287,7 @@ VulkanManager::VulkanManager(const uint32_t& screenWidth, const uint32_t& screen
 void VulkanManager::Init(GLFWwindow* glfwWindow)
 {
     CreateInstance();
-    GetPhysicalDevice();
+    AcquirePhysicalDevice();
     m_validationManagerObj->InitDebug(&m_instanceObj, nullptr);
     m_queueFamilyIndex = GetQueuesFamilyIndex();
     CreateLogicalDevice(m_queueFamilyIndex);
@@ -297,16 +299,6 @@ void VulkanManager::Init(GLFWwindow* glfwWindow)
     FindBestDepthFormat();
     CreateSurface(glfwWindow);
     CreateSwapchain();
-
-    m_acquireImageFence.resize(m_maxFrameInFlight);
-    for (uint32_t i = 0; i < m_maxFrameInFlight; i++)
-    {
-        VkFenceCreateInfo info = {};
-        info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-        info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-
-        ErrorCheck(vkCreateFence(m_logicalDevice, &info, nullptr, &m_acquireImageFence[i]));
-    }
 
     MakeSwapchainImagesPresentable(m_logicalDevice, m_swapchainImageList, m_graphicsQueue, m_queueFamilyIndex);
 
@@ -322,37 +314,37 @@ void VulkanManager::Init(GLFWwindow* glfwWindow)
     }
 
     {
-        VkSemaphoreCreateInfo semInfo{};
-        semInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+        VkCommandPoolCreateInfo createInfo{};
+        createInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+        createInfo.queueFamilyIndex = m_queueFamilyIndex;
+        createInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 
-        VkSemaphoreTypeCreateInfo semtypeInfo{};
-        semtypeInfo.semaphoreType = VkSemaphoreType::VK_SEMAPHORE_TYPE_TIMELINE;
-        semtypeInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
-        semtypeInfo.initialValue = 0;
+        ErrorCheck(vkCreateCommandPool(m_logicalDevice, &createInfo, nullptr, &m_commandPool));
 
-        semInfo.pNext = &semtypeInfo;
-        ErrorCheck(vkCreateSemaphore(m_logicalDevice, &semInfo, nullptr, &m_cpuWaitSemaphore));
+        m_commandBuffers.resize(m_maxFrameInFlight);
+        VkCommandBufferAllocateInfo alloc_info{};
+        alloc_info.commandBufferCount = m_maxFrameInFlight;
+        alloc_info.commandPool = m_commandPool;
+        alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+
+        ErrorCheck(vkAllocateCommandBuffers(m_logicalDevice, &alloc_info, &m_commandBuffers[0]));
     }
 }
 
-void VulkanManager::DeInit(std::vector<VkSemaphore> destroySemaphoreList)
+void VulkanManager::DeInit()
 {
     vkQueueWaitIdle(m_computeQueue);
     vkQueueWaitIdle(m_graphicsQueue);
 
-    vkDestroySemaphore(m_logicalDevice, m_cpuWaitSemaphore, nullptr);
-
-    for (uint32_t i = 0; i < destroySemaphoreList.size(); i++)
-    {
-        vkDestroySemaphore(m_logicalDevice, destroySemaphoreList[i], nullptr);
-    }
+//    vkDestroySemaphore(m_logicalDevice, m_cpuWaitSemaphore, nullptr);
 
     for (uint32_t i = 0; i < m_maxFrameInFlight; i++)
     {
         vkDestroySemaphore(m_logicalDevice, m_renderingCompletedSignalSemaphore[i], nullptr);
-
-        vkDestroyFence(m_logicalDevice, m_acquireImageFence[i], nullptr);
     }
+
+    vkDestroyCommandPool(m_logicalDevice, m_commandPool, nullptr);
 
     DestroySwapChain();
     vkDestroySurfaceKHR(m_instanceObj, m_surface, nullptr);
@@ -364,26 +356,6 @@ void VulkanManager::DeInit(std::vector<VkSemaphore> destroySemaphoreList)
 
 void VulkanManager::Update(uint32_t currentFrameIndex)
 {
-    VkSemaphoreSubmitInfo signalSubmitInfo{};
-    signalSubmitInfo.semaphore = m_cpuWaitSemaphore;
-    signalSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-    signalSubmitInfo.value = currentFrameIndex + 1;
-
-    VkSubmitInfo2 submitInfo{};
-    submitInfo.commandBufferInfoCount = 0;
-    submitInfo.pSignalSemaphoreInfos = &signalSubmitInfo;
-    submitInfo.signalSemaphoreInfoCount = 1;
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
-    vkQueueSubmit2(m_graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
-
-
-    uint64_t cpuWaitValue = currentFrameIndex + 1;
-    VkSemaphoreWaitInfo cpuWaitInfo{};
-    cpuWaitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
-    cpuWaitInfo.semaphoreCount = 1;
-    cpuWaitInfo.pSemaphores = &m_cpuWaitSemaphore;
-    cpuWaitInfo.pValues = &cpuWaitValue;
-    vkWaitSemaphores(m_logicalDevice, &cpuWaitInfo, UINT64_MAX);
 
 }
 
@@ -407,44 +379,119 @@ const VkDevice& VulkanManager::GetLogicalDevice() const
     return m_logicalDevice;
 }
 
-std::tuple<uint32_t, VkFence> VulkanManager::GetActiveSwapchainImageIndex(const VkSemaphore& imageAquiredSignalSemaphore)
+const VkPhysicalDevice & VulkanManager::GetPhysicalDevice() const
+{
+    return m_physicalDevice;
+}
+
+uint32_t VulkanManager::GetQueueFamilyIndex() const
+{
+    return m_queueFamilyIndex;
+}
+
+uint32_t VulkanManager::GetActiveSwapchainImageIndex(const VkSemaphore& imageAquiredSignalSemaphore)
 {
     //Get the swapchain image index
-    ErrorCheck(vkWaitForFences(m_logicalDevice, 1, &m_acquireImageFence[m_frameInFlightIndex], VK_TRUE, UINT64_MAX));
-    ErrorCheck(vkResetFences(m_logicalDevice, 1, &m_acquireImageFence[m_frameInFlightIndex]));
-
     ErrorCheck(vkAcquireNextImageKHR(m_logicalDevice, m_swapchainObj, UINT64_MAX,
         imageAquiredSignalSemaphore, VK_NULL_HANDLE, &m_currentSwpachainIndex));
 
-    return { m_currentSwpachainIndex, m_acquireImageFence[m_frameInFlightIndex] };
+    return m_currentSwpachainIndex;
 }
 
-void VulkanManager::CopyAndPresent(const VkImage & srcImage, const VkSemaphore& waitSemaphore, const VkFence& acquireFence)
+const VkQueue & VulkanManager::GetComputeQueue() const
+{
+    return m_computeQueue;
+}
+
+const VkQueue & VulkanManager::GetGraphicsQueue() const
+{
+    return m_graphicsQueue;
+}
+
+void VulkanManager::CopyAndPresent(const VkImage & srcImage, TimelineSemaphore & semaphore, const VkSemaphore& imageAcquiredSemaphore)
 {
     // Change layout to tranfer dst, then copy and change it to present layout
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
+    ErrorCheck(vkBeginCommandBuffer(m_commandBuffers[m_frameInFlightIndex], &beginInfo));
 
-    VkSemaphoreSubmitInfo signalInfo{};
-    signalInfo.deviceIndex = 0;
-    signalInfo.semaphore = m_renderingCompletedSignalSemaphore[m_frameInFlightIndex];
-    signalInfo.stageMask = VkPipelineStageFlagBits::VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-    signalInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+    std::array<VkImageMemoryBarrier, 2> image_barrier{};
+    image_barrier[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    image_barrier[0].srcAccessMask = 0;
+    image_barrier[0].dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+    image_barrier[0].image = srcImage;
+    image_barrier[0].subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+    image_barrier[0].oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    image_barrier[0].newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 
-    VkSemaphoreSubmitInfo waitInfo{};
-    waitInfo.deviceIndex = 0;
-    waitInfo.semaphore = waitSemaphore;
-    waitInfo.stageMask = VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-    waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+    image_barrier[1].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    image_barrier[1].srcAccessMask = 0;
+    image_barrier[1].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    image_barrier[1].image = m_swapchainImageList[m_currentSwpachainIndex];
+    image_barrier[1].subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+    image_barrier[1].oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    image_barrier[1].newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+
+    // The semaphore takes care of srcStageMask.
+    vkCmdPipelineBarrier(m_commandBuffers[m_frameInFlightIndex],
+        VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+        0, 0, nullptr, 0, nullptr, image_barrier.size(), image_barrier.data());
+
+    VkImageCopy region{};
+    region.dstOffset = { 0,0,0 };
+    region.dstSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+    region.extent = { (uint32_t)m_surfaceWidth, (uint32_t)m_surfaceHeight, 1 };
+    region.srcOffset = { 0,0,0 };
+    region.srcSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+
+    vkCmdCopyImage(m_commandBuffers[m_frameInFlightIndex],
+        srcImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        m_swapchainImageList[m_currentSwpachainIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        1, &region);
+
+    // Make it presentable
+    VkImageMemoryBarrier image_barrier2{};
+    image_barrier2.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    image_barrier2.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    image_barrier2.dstAccessMask = 0;
+    image_barrier2.image = m_swapchainImageList[m_currentSwpachainIndex];
+    image_barrier2.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+    image_barrier2.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    image_barrier2.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+    // The semaphore takes care of srcStageMask.
+    vkCmdPipelineBarrier(m_commandBuffers[m_frameInFlightIndex],
+        VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+        0, 0, nullptr, 0, nullptr, 1, &image_barrier2);
+
+    ErrorCheck(vkEndCommandBuffer(m_commandBuffers[m_frameInFlightIndex]));
+
+    VkSemaphoreSubmitInfo signalInfo[2]{
+        {VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO, nullptr, m_renderingCompletedSignalSemaphore[m_frameInFlightIndex], 0, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0},
+        {VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO, nullptr, semaphore.GetSemaphore(), semaphore.GetTimelineValue(SAFE_TO_PRESENT), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0}
+    };
+    
+    VkSemaphoreSubmitInfo waitInfo[2]{
+        {VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO, nullptr, semaphore.GetSemaphore(), semaphore.GetTimelineValue(GRAPHICS_FINISHED), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0},
+        {VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO, nullptr, imageAcquiredSemaphore, 0, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0}
+    };
+    
+    VkCommandBufferSubmitInfo cmdInfo{};
+    cmdInfo.commandBuffer = m_commandBuffers[m_frameInFlightIndex];
+    cmdInfo.deviceMask = 0;
+    cmdInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
 
     VkSubmitInfo2 submitInfo{};
-    submitInfo.commandBufferInfoCount = 0;
-    submitInfo.pCommandBufferInfos = nullptr;
-    submitInfo.pSignalSemaphoreInfos = &signalInfo;
-    submitInfo.pWaitSemaphoreInfos = &waitInfo;
-    submitInfo.signalSemaphoreInfoCount = 1;
+    submitInfo.commandBufferInfoCount = 1;
+    submitInfo.pCommandBufferInfos = &cmdInfo;
+    submitInfo.pSignalSemaphoreInfos = &signalInfo[0];
+    submitInfo.pWaitSemaphoreInfos = &waitInfo[0];
+    submitInfo.signalSemaphoreInfoCount = 2;
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
-    submitInfo.waitSemaphoreInfoCount = 1;
-    ErrorCheck(vkQueueSubmit2(m_graphicsQueue, 1, &submitInfo, acquireFence));
+    submitInfo.waitSemaphoreInfoCount = 2;
+    ErrorCheck(vkQueueSubmit2(m_graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE));
 
     VkPresentInfoKHR presentInfo{};
     presentInfo.pImageIndices = &m_currentSwpachainIndex;
@@ -457,6 +504,14 @@ void VulkanManager::CopyAndPresent(const VkImage & srcImage, const VkSemaphore& 
     ErrorCheck(vkQueuePresentKHR(m_graphicsQueue, &presentInfo));
 
     m_frameInFlightIndex = (m_frameInFlightIndex + 1) % m_maxFrameInFlight;
+}
+
+bool VulkanManager::AreTheQueuesIdle()
+{
+    vkQueueWaitIdle(m_computeQueue);
+    vkQueueWaitIdle(m_graphicsQueue);
+
+    return true;
 }
 
 void VulkanManager::CreateSurface(GLFWwindow * glfwWindow)
@@ -551,7 +606,7 @@ void VulkanManager::CreateSwapchain()
     swapChainCreateInfo.imageExtent.width = m_surfaceWidth;
     swapChainCreateInfo.imageFormat = m_surfaceFormat.format;
     swapChainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    swapChainCreateInfo.imageUsage = VkImageUsageFlagBits::VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    swapChainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     swapChainCreateInfo.minImageCount = m_swapchainImageCount;
     swapChainCreateInfo.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
     swapChainCreateInfo.presentMode = presentMode;

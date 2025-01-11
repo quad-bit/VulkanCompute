@@ -23,12 +23,16 @@ set(CORE_FILES
     inc/Utils.h
     inc/WindowManager.h
     inc/ValidationManager.h
+    inc/QuadRenderTask.h
+    inc/TextureCreatorComputeTask.h
 
     src/VulkanManager.cpp
     src/ValidationManager.cpp
     src/WindowManager.cpp
     src/Utils.cpp
-    
+    src/QuadRenderTask.cpp
+    src/TextureCreatorComputeTask.cpp
+
     src/main.cpp
 )
 
@@ -42,8 +46,17 @@ target_include_directories(${TARGET_NAME}
 
 target_compile_definitions(${TARGET_NAME} PUBLIC
     ASSETS_PATH="${ASSETS_PATH}"
+    SPV_PATH="${CMAKE_BINARY_DIR}/Spvs/"
     GLFW_ENABLED
 )
 
 target_link_libraries(${TARGET_NAME} PUBLIC Vulkan::Vulkan glfw glm::glm)
 
+add_custom_command(
+    TARGET ${TARGET_NAME}
+    DEPENDS ${TARGET_NAME}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/Spvs
+    COMMAND glslangvalidator -V ${ASSETS_PATH}/Mandlebrot.comp -o ${CMAKE_BINARY_DIR}/Spvs/Mandlebrot.spv
+    COMMAND glslangvalidator -V ${ASSETS_PATH}/FullScreenQuadVert.vert -o ${CMAKE_BINARY_DIR}/Spvs/FullScreenQuadVert.spv
+    COMMAND glslangvalidator -V ${ASSETS_PATH}/FullScreenQuadFrag.frag -o ${CMAKE_BINARY_DIR}/Spvs/FullScreenQuadFrag.spv
+)
