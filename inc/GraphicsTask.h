@@ -1,7 +1,7 @@
 #pragma once
 #include "Utils.h"
 
-class QuadRenderTask
+class GraphicsTask
 {
 private:
     const VkQueue& m_graphicsQueue;
@@ -23,9 +23,6 @@ private:
     std::vector<VkDeviceMemory> m_colorAttachmentMemory;
     std::vector<VkImageView> m_colorAttachmentViews;
     
-    const std::vector<VkDescriptorSet>& m_sampledDescriptorSets;
-    const std::vector<VkImage>& m_images;
-
     VkPipeline m_pipeline;
     uint32_t m_screenWidth;
     uint32_t m_screenHeight;
@@ -35,10 +32,9 @@ private:
 
 public:
 
-    QuadRenderTask(const VkDevice& device, const VkPhysicalDevice& physicalDevice, const VkQueue& graphicsQueue,
-        uint32_t queueFamilyIndex, const VkDescriptorSetLayout& sampledLayout, uint32_t maxFrameInFlight,
-        uint32_t screenWidth, uint32_t screenHeight, const std::vector<VkDescriptorSet>& sampledDescriptorSets, const std::vector<VkImage>& images);
-    ~QuadRenderTask();
+    GraphicsTask(const VkDevice& device, const VkPhysicalDevice& physicalDevice, const VkQueue& graphicsQueue,
+        uint32_t queueFamilyIndex, uint32_t maxFrameInFlight, uint32_t screenWidth, uint32_t screenHeight);
+    ~GraphicsTask();
 
     //Create quad draw specific resources
     void Init();

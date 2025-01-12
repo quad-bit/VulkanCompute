@@ -1,12 +1,11 @@
-#include "..\inc\QuadRenderTask.h"
+#include "..\inc\GraphicsTask.h"
 #include <array>
 
 
-QuadRenderTask::QuadRenderTask(const VkDevice& device, const VkPhysicalDevice& physicalDevice, const VkQueue & graphicsQueue, uint32_t queueFamilyIndex,
-    const VkDescriptorSetLayout& sampledLayout, uint32_t maxFrameInFlight, uint32_t screenWidth, uint32_t screenHeight,
-    const std::vector<VkDescriptorSet>& sampledDescriptorSets, const std::vector<VkImage>& images):
+GraphicsTask::GraphicsTask(const VkDevice& device, const VkPhysicalDevice& physicalDevice, const VkQueue & graphicsQueue, uint32_t queueFamilyIndex,
+    uint32_t maxFrameInFlight, uint32_t screenWidth, uint32_t screenHeight):
     m_graphicsQueue(graphicsQueue), m_device(device), m_screenWidth(screenWidth), m_screenHeight(screenHeight),
-    m_maxFrameInFlights(maxFrameInFlight), m_sampledDescriptorSets(sampledDescriptorSets), m_images(images)
+    m_maxFrameInFlights(maxFrameInFlight)
 {
     VkCommandPoolCreateInfo createInfo{};
     createInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
@@ -24,14 +23,14 @@ QuadRenderTask::QuadRenderTask(const VkDevice& device, const VkPhysicalDevice& p
 
     ErrorCheck(vkAllocateCommandBuffers(device, &alloc_info, &m_commandBuffers[0]));
 
-    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
+    /*VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
     pipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
     pipelineLayoutCreateInfo.pSetLayouts = &sampledLayout;
     pipelineLayoutCreateInfo.pushConstantRangeCount = 0;
     pipelineLayoutCreateInfo.setLayoutCount = 1;
     pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 
-    ErrorCheck(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr, &m_pipelineLayout));
+    ErrorCheck(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr, &m_pipelineLayout));*/
 
     // Render pass attachments
     m_colorAttachmentViews.resize(maxFrameInFlight);
@@ -89,7 +88,7 @@ QuadRenderTask::QuadRenderTask(const VkDevice& device, const VkPhysicalDevice& p
     pipelineRenderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
 
     // Create pipeline
-    std::string vertSpvPath = std::string{ SPV_PATH } +"FullScreenQuadVert.spv";
+    /*std::string vertSpvPath = std::string{ SPV_PATH } +"FullScreenQuadVert.spv";
     std::string fragSpvPath = std::string{ SPV_PATH } +"FullScreenQuadFrag.spv";
 
     auto[vertShaderModule, vertShaderStage] = CreateShaderModule(device, vertSpvPath, VkShaderStageFlagBits::VK_SHADER_STAGE_VERTEX_BIT);
@@ -184,16 +183,16 @@ QuadRenderTask::QuadRenderTask(const VkDevice& device, const VkPhysicalDevice& p
     graphicsPipelineCreateInfo.pNext = &pipelineRenderingCreateInfo;
 
     ErrorCheck( vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &graphicsPipelineCreateInfo,
-        nullptr, &m_pipeline));
+        nullptr, &m_pipeline));*/
 }
 
-QuadRenderTask::~QuadRenderTask()
+GraphicsTask::~GraphicsTask()
 {
     vkDestroyCommandPool(m_device, m_commandPool, nullptr);
-    vkDestroyPipelineLayout(m_device, m_pipelineLayout, nullptr);
-    vkDestroyShaderModule(m_device, m_vertexShaderModule, nullptr);
-    vkDestroyShaderModule(m_device, m_fragmentShaderModule, nullptr);
-    vkDestroyPipeline(m_device, m_pipeline, nullptr);
+    //vkDestroyPipelineLayout(m_device, m_pipelineLayout, nullptr);
+    //vkDestroyShaderModule(m_device, m_vertexShaderModule, nullptr);
+    //vkDestroyShaderModule(m_device, m_fragmentShaderModule, nullptr);
+    //vkDestroyPipeline(m_device, m_pipeline, nullptr);
 
     for (uint32_t i = 0; i < m_colorAttachments.size(); i++)
     {
@@ -203,7 +202,7 @@ QuadRenderTask::~QuadRenderTask()
     }
 }
 
-void QuadRenderTask::BuildCommandBuffers(const uint32_t & frameInFlight, bool changeImageLayout)
+void GraphicsTask::BuildCommandBuffers(const uint32_t & frameInFlight, bool changeImageLayout)
 {
     VkViewport viewport = { 0.0f, 0.0f, static_cast<float>(m_screenWidth), static_cast<float>(m_screenHeight), 0.0f, 1.0f };
     VkRect2D   scissor = { {0, 0}, {m_screenWidth, m_screenHeight} };
@@ -267,19 +266,19 @@ void QuadRenderTask::BuildCommandBuffers(const uint32_t & frameInFlight, bool ch
 
     vkCmdBeginRendering(m_commandBuffers[frameInFlight], &renderingInfo);
 
-    vkCmdBindPipeline(m_commandBuffers[frameInFlight], VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
+    //vkCmdBindPipeline(m_commandBuffers[frameInFlight], VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
     vkCmdSetViewport(m_commandBuffers[frameInFlight], 0, 1, &viewport);
     vkCmdSetScissor(m_commandBuffers[frameInFlight], 0, 1, &scissor);
 
-    vkCmdBindDescriptorSets(m_commandBuffers[frameInFlight], VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1, &m_sampledDescriptorSets[frameInFlight], 0, nullptr);
-    vkCmdDraw(m_commandBuffers[frameInFlight], 3, 1, 0, 0);
+    //vkCmdBindDescriptorSets(m_commandBuffers[frameInFlight], VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1, &m_sampledDescriptorSets[frameInFlight], 0, nullptr);
+    //vkCmdDraw(m_commandBuffers[frameInFlight], 3, 1, 0, 0);
 
     vkCmdEndRendering(m_commandBuffers[frameInFlight]);
 
     ErrorCheck(vkEndCommandBuffer(m_commandBuffers[frameInFlight]));
 }
 
-void QuadRenderTask::Update(const uint32_t & frameIndex, const uint32_t & frameInFlight,
+void GraphicsTask::Update(const uint32_t & frameIndex, const uint32_t & frameInFlight,
     const VkSemaphore& timelineSem, uint64_t signalValue, uint64_t waitValue)
 {
     if(frameIndex > 1)
@@ -302,11 +301,10 @@ void QuadRenderTask::Update(const uint32_t & frameIndex, const uint32_t & frameI
     submitInfo.commandBufferInfoCount = 1;
     submitInfo.pCommandBufferInfos = &bufInfo;
     submitInfo.pSignalSemaphoreInfos = &signalInfo;
-    submitInfo.pWaitSemaphoreInfos = &waitInfo;
+    //submitInfo.pWaitSemaphoreInfos = &waitInfo;
     submitInfo.signalSemaphoreInfoCount = 1;
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
-    submitInfo.waitSemaphoreInfoCount = 1;
-
+    //submitInfo.waitSemaphoreInfoCount = 1;
 
     // If the threads are being killed, we need to skip the queue submission to allow the program to exit gracefully
     //if (m_alive)
@@ -315,7 +313,7 @@ void QuadRenderTask::Update(const uint32_t & frameIndex, const uint32_t & frameI
     }
 }
 
-const std::vector<VkImage>& QuadRenderTask::GetColorAttachments()
+const std::vector<VkImage>& GraphicsTask::GetColorAttachments()
 {
     return m_colorAttachments;
 }

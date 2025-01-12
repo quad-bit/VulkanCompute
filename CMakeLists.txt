@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
 
 include(${CMAKE_SOURCE_DIR}/cmake/vcpkg.cmake)
-set(TARGET_NAME "compute_vulkan")
+set(TARGET_NAME "VulkanPlayground")
 
 project (${TARGET_NAME})
 
@@ -23,15 +23,13 @@ set(CORE_FILES
     inc/Utils.h
     inc/WindowManager.h
     inc/ValidationManager.h
-    inc/QuadRenderTask.h
-    inc/TextureCreatorComputeTask.h
+    inc/GraphicsTask.h
 
     src/VulkanManager.cpp
     src/ValidationManager.cpp
     src/WindowManager.cpp
     src/Utils.cpp
-    src/QuadRenderTask.cpp
-    src/TextureCreatorComputeTask.cpp
+    src/GraphicsTask.cpp
 
     src/main.cpp
 )
@@ -52,11 +50,11 @@ target_compile_definitions(${TARGET_NAME} PUBLIC
 
 target_link_libraries(${TARGET_NAME} PUBLIC Vulkan::Vulkan glfw glm::glm)
 
-add_custom_command(
-    TARGET ${TARGET_NAME}
-    DEPENDS ${TARGET_NAME}
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/Spvs
-    COMMAND glslangvalidator -V ${ASSETS_PATH}/Mandlebrot.comp -o ${CMAKE_BINARY_DIR}/Spvs/Mandlebrot.spv
-    COMMAND glslangvalidator -V ${ASSETS_PATH}/FullScreenQuadVert.vert -o ${CMAKE_BINARY_DIR}/Spvs/FullScreenQuadVert.spv
-    COMMAND glslangvalidator -V ${ASSETS_PATH}/FullScreenQuadFrag.frag -o ${CMAKE_BINARY_DIR}/Spvs/FullScreenQuadFrag.spv
-)
+# add_custom_command(
+#     TARGET ${TARGET_NAME}
+#     DEPENDS ${TARGET_NAME}
+#     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/Spvs
+#     COMMAND glslangvalidator -V ${ASSETS_PATH}/Mandlebrot.comp -o ${CMAKE_BINARY_DIR}/Spvs/Mandlebrot.spv
+#     COMMAND glslangvalidator -V ${ASSETS_PATH}/FullScreenQuadVert.vert -o ${CMAKE_BINARY_DIR}/Spvs/FullScreenQuadVert.spv
+#     COMMAND glslangvalidator -V ${ASSETS_PATH}/FullScreenQuadFrag.frag -o ${CMAKE_BINARY_DIR}/Spvs/FullScreenQuadFrag.spv
+# )
