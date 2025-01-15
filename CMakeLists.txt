@@ -24,12 +24,16 @@ set(CORE_FILES
     inc/WindowManager.h
     inc/ValidationManager.h
     inc/GraphicsTask.h
+    inc/Camera.h
+    inc/Transform.h
 
     src/VulkanManager.cpp
     src/ValidationManager.cpp
     src/WindowManager.cpp
     src/Utils.cpp
     src/GraphicsTask.cpp
+    src/Camera.cpp
+    src/Transform.cpp
 
     src/main.cpp
 )
