@@ -54,6 +54,11 @@ const glm::mat4& Camera::GetProjectionMat()
     return projectionMat;
 }
 
+glm::vec3 Camera::GetPosition()
+{
+    return transform.GetLocalPosition();
+}
+
 const float& Camera::GetFOV() const 
 {
     return this->fov;

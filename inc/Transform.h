@@ -1,3 +1,4 @@
+#pragma once
 #include <vector>
 #include "Utils.h"
 
@@ -28,7 +29,7 @@ public:
 
     bool isTransformUpdated;
     Transform();
-    Transform(const glm::vec3 position, const glm::vec3 rotation, const glm::vec3 scale);
+    Transform(const glm::vec3& position, const glm::vec3& rotation, const glm::vec3& scale);
 
     const Transform& GetParent();
     void SetParent(Transform* transform);

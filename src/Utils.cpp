@@ -4,6 +4,9 @@
 #include <optional>
 #include <fstream>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+
 void ErrorCheck(VkResult result)
 {
 #ifdef _DEBUG
@@ -71,6 +74,17 @@ void ErrorCheck(VkResult result)
 #endif
 }
 
+size_t GetMemoryAlignedDataSizeForBuffer(const VkPhysicalDevice & device, const size_t & dataSize)
+{
+    size_t alignedDataSize = dataSize;
+    VkPhysicalDeviceProperties physicalDeviceProps;
+    vkGetPhysicalDeviceProperties(device, &physicalDeviceProps);
+    VkDeviceSize minUniformAlignment = physicalDeviceProps.limits.minUniformBufferOffsetAlignment;
+    if (minUniformAlignment)
+        alignedDataSize = (dataSize + minUniformAlignment - 1) & ~(minUniformAlignment - 1);
+    return alignedDataSize;
+}
+
 VkCommandBuffer AllocateCommandBuffer(const VkDevice & device, const VkCommandPool & commandPool)
 {
     VkCommandBufferAllocateInfo allocInfo = {};
@@ -106,7 +120,7 @@ VkDeviceMemory AllocateHostCoherentMemory(const VkPhysicalDevice & physicalDevic
         }
 
         // Does this kind of memory support our usage requirements?
-        if ((memoryProperties.memoryTypes[i].propertyFlags & (VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
+        if ((memoryProperties.memoryTypes[i].propertyFlags & (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
             != VkMemoryPropertyFlags{})
         {
             // Return the INDEX of a suitable memory type
@@ -128,14 +142,94 @@ VkDeviceMemory AllocateHostCoherentMemory(const VkPhysicalDevice & physicalDevic
     return memory;
 }
 
-//std::tuple<VkBuffer, VkDeviceMemory, int, int> LoadImageIntoHostCoherentMemory(const VkPhysicalDevice & physicalDevice, const VkDevice & device, const std::string & pathToImageFile)
-//{
-//    return std::tuple<VkBuffer, VkDeviceMemory, int, int>();
-//}
+
+std::tuple<VkBuffer, VkDeviceMemory, int, int> LoadImageIntoHostCoherentMemory(const VkPhysicalDevice & physicalDevice, const VkDevice & device, const std::string & pathToImageFile)
+{
+    const int desiredColorChannels = STBI_rgb_alpha;
+    int width, height, channelsInFile;
+    stbi_uc* pixels = stbi_load(pathToImageFile.c_str(), &width, &height, &channelsInFile, desiredColorChannels);
+    size_t imageDataSize = width * height * desiredColorChannels;
+
+    // Convert RGB -> BGR
+    // TODO: Not sure if this is a good idea on all different GPUs. Probably it's not. If the image looks odd => try something else here.
+    for (int i = 0; i < imageDataSize; i += desiredColorChannels) {
+        stbi_uc tmp = pixels[i];
+        pixels[i] = pixels[i + 2];
+        pixels[i + 2] = tmp;
+    }
+
+    VkBuffer buffer;
+    VkDeviceMemory bufferMemory;
+    CreateBufferAndMemory(physicalDevice, device, buffer, bufferMemory, static_cast<VkDeviceSize>(imageDataSize), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+    // Copy the image's data into the buffer
+    void* pData;
+    ErrorCheck(vkMapMemory(device, bufferMemory, 0, static_cast<VkDeviceSize>(imageDataSize), 0, &pData));
+    memcpy(pData, pixels, static_cast<VkDeviceSize>(imageDataSize));
+    vkUnmapMemory(device, bufferMemory);
+
+    stbi_image_free(pixels);
+
+    return std::make_tuple(buffer, bufferMemory, width, height);
+}
 
 void FreeMemory(const VkDevice & device, const VkDeviceMemory& memory)
 {
     vkFreeMemory(device, memory, nullptr);
+}
+
+void CreateBufferAndMemory(const VkPhysicalDevice & physicalDevice, const VkDevice & device,
+    VkBuffer & buffer, VkDeviceMemory & memory, const size_t & dataSize,
+    const VkBufferUsageFlags & usage, const VkMemoryPropertyFlags & memProps)
+{
+    auto alignedSize = GetMemoryAlignedDataSizeForBuffer(physicalDevice, dataSize);
+
+    VkBufferCreateInfo info{};
+    info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    info.size = alignedSize;
+    info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    info.usage = usage;
+    ErrorCheck(vkCreateBuffer(device, &info, nullptr, &buffer));
+
+    // Get memory types supported by the physical device:
+    VkPhysicalDeviceMemoryProperties memoryProperties;
+    vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memoryProperties);
+
+    VkMemoryRequirements memoryRequirements;
+    vkGetBufferMemoryRequirements(device, buffer, &memoryRequirements);
+
+    std::optional<uint32_t> memIndex;
+    // In search for a suitable memory type INDEX:
+    for (uint32_t i = 0u; i < memoryProperties.memoryTypeCount; ++i)
+    {
+        // Is this kind of memory suitable for our buffer?
+        const auto bitmask = memoryRequirements.memoryTypeBits;
+        const auto bit = 1 << i;
+        if (0 == (bitmask & bit))
+        {
+            continue; // => nope
+        }
+
+        // Does this kind of memory support our usage requirements?
+        if ((memoryProperties.memoryTypes[i].propertyFlags & (memProps))
+            != VkMemoryPropertyFlags{})
+        {
+            // Return the INDEX of a suitable memory type
+            memIndex = i;
+            break;
+        }
+    }
+
+    assert(memIndex.has_value() == true);
+
+    VkMemoryAllocateInfo memoryAllocInfo = {};
+    memoryAllocInfo.allocationSize = std::max(alignedSize, memoryRequirements.size);
+    memoryAllocInfo.memoryTypeIndex = memIndex.value();
+    memoryAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+
+    ErrorCheck(vkAllocateMemory(device, &memoryAllocInfo, nullptr, &memory));
+
+    ErrorCheck(vkBindBufferMemory(device, buffer, memory, 0));
 }
 
 void DestroyBuffer(const VkDevice & device, const VkBuffer& buffer)
@@ -288,11 +382,6 @@ std::tuple<VkShaderModule, VkPipelineShaderStageCreateInfo> CreateShaderModule(c
 void DestroyShaderModule(const VkDevice & device, VkShaderModule shaderModule)
 {
     vkDestroyShaderModule(device, shaderModule, nullptr);
-}
-
-std::tuple<VkBuffer, VkDeviceMemory> CreateBufferAndMemory(const VkDevice & device, const VkPhysicalDevice & physicalDevice, const size_t bufferSize, const VkBufferUsageFlags & bufferUsageFlags)
-{
-    return std::tuple<VkBuffer, VkDeviceMemory>();
 }
 
 void CopyDataIntoHostCoherentMemory(const VkDevice & device, const size_t & dataSize, const void * data, VkDeviceMemory & memory)

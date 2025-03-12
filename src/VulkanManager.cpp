@@ -408,6 +408,11 @@ const VkQueue & VulkanManager::GetGraphicsQueue() const
     return m_graphicsQueue;
 }
 
+const VkFormat & VulkanManager::GetDepthFormat() const
+{
+    return m_depthFormat;
+}
+
 void VulkanManager::CopyAndPresent(const VkImage & srcImage, TimelineSemaphore & semaphore, const VkSemaphore& imageAcquiredSemaphore)
 {
     // Change layout to tranfer dst, then copy and change it to present layout

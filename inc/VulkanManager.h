@@ -67,6 +67,7 @@ public:
     uint32_t GetActiveSwapchainImageIndex(const VkSemaphore& imageAquiredSignalSemaphore);
     const VkQueue& GetComputeQueue() const;
     const VkQueue& GetGraphicsQueue() const;
+    const VkFormat& GetDepthFormat() const;
 
     void CopyAndPresent(const VkImage& srcImage, TimelineSemaphore& semaphore, const VkSemaphore& imageAcquiredSemaphore);
     bool AreTheQueuesIdle();

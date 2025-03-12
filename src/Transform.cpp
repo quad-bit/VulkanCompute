@@ -26,7 +26,7 @@ Transform::Transform()
     Init();
 }
 
-Transform::Transform(const glm::vec3 position, const glm::vec3 rotation, const glm::vec3 scale)
+Transform::Transform(const glm::vec3& position, const glm::vec3& rotation, const glm::vec3& scale)
     :localPosition(position), localEulerAngle(rotation), localScale(scale)
 {
     Init();

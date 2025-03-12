@@ -19,6 +19,10 @@
         },
         {
             "name": "plog"
+        },
+        {
+            "name": "stb",
+            "version>=":"2021-09-10"
         }
   ],
   "builtin-baseline": "d5cfd0d24a69bc341b87ce4e85419fe237139d1d",

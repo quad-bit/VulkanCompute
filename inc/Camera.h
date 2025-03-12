@@ -1,5 +1,7 @@
 #pragma once
 
+// This is horrible.
+
 #include <vector>
 #include "Transform.h"
 
@@ -69,7 +71,7 @@ public:
     // Returns the view matrix calculated using Euler Angles and the LookAt Matrix
     const glm::mat4& GetViewMatrix();
     const glm::mat4& GetProjectionMat();
-    const glm::vec3& GetPosition() const;
+    glm::vec3 GetPosition();
     const glm::vec3& GetFront() const;
     const glm::vec3& GetUp() const;
     const glm::vec3& GetRight() const; 

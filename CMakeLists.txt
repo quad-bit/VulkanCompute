@@ -17,6 +17,7 @@ set(ASSETS_PATH "${CMAKE_SOURCE_DIR}/assets/")
 find_package(Vulkan REQUIRED)
 find_package(glm REQUIRED)
 find_package(glfw3 3.3 REQUIRED)
+find_package(Stb REQUIRED)
 
 set(CORE_FILES
     inc/VulkanManager.h
@@ -24,14 +25,18 @@ set(CORE_FILES
     inc/WindowManager.h
     inc/ValidationManager.h
     inc/GraphicsTask.h
+    inc/ComputeTask.h
     inc/Camera.h
     inc/Transform.h
+    inc/Common.h
+    inc/Timer.h
 
     src/VulkanManager.cpp
     src/ValidationManager.cpp
     src/WindowManager.cpp
     src/Utils.cpp
     src/GraphicsTask.cpp
+    src/ComputeTask.cpp
     src/Camera.cpp
     src/Transform.cpp
 
@@ -52,13 +57,22 @@ target_compile_definitions(${TARGET_NAME} PUBLIC
     GLFW_ENABLED
 )
 
+target_include_directories(${TARGET_NAME} PRIVATE ${Stb_INCLUDE_DIR})
 target_link_libraries(${TARGET_NAME} PUBLIC Vulkan::Vulkan glfw glm::glm)
 
-# add_custom_command(
-#     TARGET ${TARGET_NAME}
-#     DEPENDS ${TARGET_NAME}
-#     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/Spvs
-#     COMMAND glslangvalidator -V ${ASSETS_PATH}/Mandlebrot.comp -o ${CMAKE_BINARY_DIR}/Spvs/Mandlebrot.spv
-#     COMMAND glslangvalidator -V ${ASSETS_PATH}/FullScreenQuadVert.vert -o ${CMAKE_BINARY_DIR}/Spvs/FullScreenQuadVert.spv
-#     COMMAND glslangvalidator -V ${ASSETS_PATH}/FullScreenQuadFrag.frag -o ${CMAKE_BINARY_DIR}/Spvs/FullScreenQuadFrag.spv
-# )
+add_custom_target(
+    GeneratShaderBinaries
+    DEPENDS ${ASSETS_PATH}
+)
+
+add_custom_command(
+    TARGET GeneratShaderBinaries
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/Spvs
+    COMMAND glslangvalidator -V ${ASSETS_PATH}/ClothSim.comp -o ${CMAKE_BINARY_DIR}/Spvs/ClothSim.spv
+    COMMAND glslangvalidator -V ${ASSETS_PATH}/UnlitTextured.vert -o ${CMAKE_BINARY_DIR}/Spvs/UnlitTexturedVert.spv
+    COMMAND glslangvalidator -V ${ASSETS_PATH}/UnlitTextured.frag -o ${CMAKE_BINARY_DIR}/Spvs/UnlitTexturedFrag.spv
+)
+
+add_dependencies(${TARGET_NAME} GeneratShaderBinaries)
+
+

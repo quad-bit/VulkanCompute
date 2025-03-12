@@ -15,12 +15,16 @@ We need to configure it to use the Vulkan range of 0.0 to 1.0 using the GLM_FORC
 #include <glm/glm.hpp>
 #include <glm/gtx/transform.hpp>
 
+
 #define Vec4ToVec3(a) glm::vec3(a.x, a.y, a.z)
 #define Vec3ToVec4_1(a) glm::vec4(a.x, a.y, a.z, 1.0f)
 #define Vec3ToVec4_0(a) glm::vec4(a.x, a.y, a.z, 0.0f)
 
 
 void ErrorCheck(VkResult result);
+
+size_t GetMemoryAlignedDataSizeForBuffer(const VkPhysicalDevice& device, const size_t& dataSize);
+
 
 VkCommandBuffer AllocateCommandBuffer(
     const VkDevice& device,
@@ -42,16 +46,22 @@ VkDeviceMemory AllocateHostCoherentMemory(
 
 // Load an image from a file, and copy it into a newly created buffer (backed with memory already):
 // Returns a tuple with: <0> the buffer handle, <1> the memory handle, <2> width, <3> height
-//std::tuple<VkBuffer, VkDeviceMemory, int, int> LoadImageIntoHostCoherentMemory(
-//    const VkPhysicalDevice& physicalDevice,
-//    const VkDevice& device,
-//    const std::string& pathToImageFile
-//);
+std::tuple<VkBuffer, VkDeviceMemory, int, int> LoadImageIntoHostCoherentMemory(
+    const VkPhysicalDevice& physicalDevice,
+    const VkDevice& device,
+    const std::string& pathToImageFile
+);
 
 // Free memory that has been allocated with AllocateHostCoherentMemoryForBuffer
 void FreeMemory(
     const VkDevice& device,
     const VkDeviceMemory& memory
+);
+
+void CreateBufferAndMemory(
+    const VkPhysicalDevice& physicalDevice, const VkDevice& device,
+    VkBuffer& buffer, VkDeviceMemory& memory, const size_t& dataSize,
+    const VkBufferUsageFlags& usage, const VkMemoryPropertyFlags& memProps
 );
 
 void DestroyBuffer(
@@ -108,13 +118,6 @@ std::tuple<VkShaderModule, VkPipelineShaderStageCreateInfo> CreateShaderModule(
 void DestroyShaderModule(
     const VkDevice& device,
     VkShaderModule shaderModule
-);
-
-std::tuple<VkBuffer, VkDeviceMemory> CreateBufferAndMemory(
-    const VkDevice& device,
-    const VkPhysicalDevice& physicalDevice,
-    const size_t bufferSize,
-    const VkBufferUsageFlags& bufferUsageFlags
 );
 
 // Copy data of the gifen size into the buffer
