@@ -50,11 +50,25 @@ target_compile_definitions(${TARGET_NAME} PUBLIC
 
 target_link_libraries(${TARGET_NAME} PUBLIC Vulkan::Vulkan glfw glm::glm)
 
-# add_custom_command(
-#     TARGET ${TARGET_NAME}
-#     DEPENDS ${TARGET_NAME}
-#     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/Spvs
-#     COMMAND glslangvalidator -V ${ASSETS_PATH}/Mandlebrot.comp -o ${CMAKE_BINARY_DIR}/Spvs/Mandlebrot.spv
-#     COMMAND glslangvalidator -V ${ASSETS_PATH}/FullScreenQuadVert.vert -o ${CMAKE_BINARY_DIR}/Spvs/FullScreenQuadVert.spv
-#     COMMAND glslangvalidator -V ${ASSETS_PATH}/FullScreenQuadFrag.frag -o ${CMAKE_BINARY_DIR}/Spvs/FullScreenQuadFrag.spv
-# )
+set(VALIDATOR_NAME "glslangvalidator")
+
+if(UNIX AND NOT APPLE)
+    set(VALIDATOR_NAME "glslangValidator")
+endif()
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "debug" OR CMAKE_BUILD_TYPE STREQUAL "")
+    message(STATUS " ### Setting up the debug mode ###")
+    target_compile_definitions(${TARGET_NAME} PUBLIC
+        _DEBUG
+    )
+endif()
+
+add_custom_command(
+     TARGET ${TARGET_NAME}
+     PRE_BUILD
+     DEPENDS ${TARGET_NAME}
+     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/Spvs
+     COMMAND ${VALIDATOR_NAME} -V ${ASSETS_PATH}/Mandlebrot.comp -o ${CMAKE_BINARY_DIR}/Spvs/Mandlebrot.spv
+     COMMAND ${VALIDATOR_NAME} -V ${ASSETS_PATH}/FullScreenQuadVert.vert -o ${CMAKE_BINARY_DIR}/Spvs/FullScreenQuadVert.spv
+     COMMAND ${VALIDATOR_NAME} -V ${ASSETS_PATH}/FullScreenQuadFrag.frag -o ${CMAKE_BINARY_DIR}/Spvs/FullScreenQuadFrag.spv
+ )
