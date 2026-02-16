@@ -78,20 +78,6 @@ int main()
         timelineSemaphores.emplace_back(std::make_unique<TimelineSemaphore>(vulkanManager->GetLogicalDevice()));
     }
 
-    VkSemaphore timelineSemaphore = VK_NULL_HANDLE;
-    {
-        VkSemaphoreCreateInfo createInfo{};
-        createInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-
-        VkSemaphoreTypeCreateInfoKHR typeCreateInfo{};
-        typeCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO_KHR;
-        typeCreateInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE_KHR;
-        typeCreateInfo.initialValue = 0;
-        createInfo.pNext = &typeCreateInfo;
-
-        ErrorCheck(vkCreateSemaphore(vulkanManager->GetLogicalDevice(), &createInfo, nullptr, &timelineSemaphore));
-    }
-
     uint64_t frameIndex = 0;
 
     //timer.Sleep(10);
@@ -145,7 +131,7 @@ int main()
 
     if (vulkanManager->AreTheQueuesIdle())
     {
-        vkDestroySemaphore(vulkanManager->GetLogicalDevice(), timelineSemaphore, nullptr);
+        //vkDestroySemaphore(vulkanManager->GetLogicalDevice(), timelineSemaphore, nullptr);
 
         for(auto& sem : swapchainImageAcquiredSemaphores)
             vkDestroySemaphore(vulkanManager->GetLogicalDevice(), sem, nullptr);

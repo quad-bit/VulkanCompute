@@ -52,7 +52,7 @@ public:
         {
             if (m_oneSecAccumulator >= 1.0)
             {
-                std::cout << "1 : fps : " << m_frameCounter << "\n";
+                //std::cout << "1 : fps : " << m_frameCounter << "\n";
                 m_oneSecAccumulator = m_oneSecAccumulator - 1.0;
                 m_frameCounter = 0;
             }
@@ -63,7 +63,7 @@ public:
                 {
                     // if not possible sleep till one sec duration gets over
                     std::this_thread::sleep_for(std::chrono::duration<double>(1.0 - m_oneSecAccumulator));
-                    std::cout << "2 : fps : " << m_frameCounter << "\n";
+                    //std::cout << "2 : fps : " << m_frameCounter << "\n";
                     m_oneSecAccumulator = 0.0;
                     m_frameCounter = 0;
                 }

@@ -5,11 +5,12 @@
 
 namespace
 {
+    // For a minimum of two queues compute and graphics
+    float queuePriority[2]{ 1.0f, 1.0f };
+
     std::vector<VkDeviceQueueCreateInfo> FindQueue(const uint32_t & queueFamilyIndex)
     {
         constexpr uint32_t minGraphicQueueRequired = 1, minCopmuteQueueRequired = 1;
-
-        float queuePriority[minGraphicQueueRequired + minCopmuteQueueRequired]{ 1.0f, 1.0f};
 
         std::vector<VkDeviceQueueCreateInfo> creatInfoList;
 
