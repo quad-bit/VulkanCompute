@@ -2,6 +2,7 @@
 #include "Utils.h"
 #include "Camera.h"
 #include "Transform.h"
+#include <memory>
 
 class GraphicsTask
 {
@@ -40,9 +41,9 @@ private:
     std::vector<VkDeviceMemory> m_clothTextureMemory;
     std::vector<VkImageView> m_clothTextureViews;
 
-    
+
     VkDescriptorPool m_descriptorPool;
-    
+
     VkRenderingAttachmentInfo depthInfo{};
     std::vector<VkRenderingAttachmentInfo> colorInfoList;
     std::vector<VkRenderingInfo> m_renderInfoList;

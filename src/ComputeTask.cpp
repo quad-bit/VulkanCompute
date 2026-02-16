@@ -364,7 +364,7 @@ ComputeTask::~ComputeTask()
 
 void ComputeTask::Update(const uint64_t & frameIndex, const uint32_t & frameInFlight, const VkSemaphore & semaphore, uint64_t signalValue)
 {
-    if (frameIndex >= 2000)
+    if (frameIndex >= 500)
     {
         pushConst.m_changeScene = 1;
         static int counter = 0;

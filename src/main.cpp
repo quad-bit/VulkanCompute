@@ -94,11 +94,11 @@ int main()
 
     uint64_t frameIndex = 0;
 
-    timer.Sleep(10);
+    //timer.Sleep(10);
 
     while (windowManagerObj->Update())
     {
-        timer.Update();
+        timer.StartFrame();
 
         auto currentFrameInFlight = vulkanManager->GetFrameInFlightIndex();
         if (timelineSemaphores[currentFrameInFlight]->GetFrameIndex() > 0)
@@ -138,6 +138,8 @@ int main()
 
         frameIndex++;
         timelineSemaphores[currentFrameInFlight]->IncrementFrameIndex();
+
+        timer.EndFrame();
 
     }
 
