@@ -414,7 +414,7 @@ const VkFormat & VulkanManager::GetDepthFormat() const
     return m_depthFormat;
 }
 
-void VulkanManager::CopyAndPresent(const VkImage & srcImage, TimelineSemaphore & semaphore, const VkSemaphore& imageAcquiredSemaphore)
+void VulkanManager::CopyAndPresent(const VkImage & srcImage, TimelineSemaphore & semaphore, const VkSemaphore& imageAcquiredSemaphore, uint64_t waitValue)
 {
     // Change layout to tranfer dst, then copy and change it to present layout
     VkCommandBufferBeginInfo beginInfo{};
@@ -480,7 +480,7 @@ void VulkanManager::CopyAndPresent(const VkImage & srcImage, TimelineSemaphore &
     };
     
     VkSemaphoreSubmitInfo waitInfo[2]{
-        {VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO, nullptr, semaphore.GetSemaphore(), semaphore.GetTimelineValue(GRAPHICS_FINISHED), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0},
+        {VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO, nullptr, semaphore.GetSemaphore(), waitValue, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0},
         {VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO, nullptr, imageAcquiredSemaphore, 0, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0}
     };
     

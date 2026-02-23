@@ -142,6 +142,22 @@ VkDeviceMemory AllocateHostCoherentMemory(const VkPhysicalDevice & physicalDevic
     return memory;
 }
 
+std::tuple<VkBuffer, VkDeviceMemory> LoadImageDataIntoStagingBuffer(const VkPhysicalDevice& physicalDevice, const VkDevice& device, const unsigned char* data, const size_t& dataSize)
+{
+    VkBuffer buffer;
+    VkDeviceMemory bufferMemory;
+    CreateBufferAndMemory(physicalDevice, device, buffer, bufferMemory, static_cast<VkDeviceSize>(dataSize),
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+    // Copy the image's data into the buffer
+    void* pData;
+    ErrorCheck(vkMapMemory(device, bufferMemory, 0, static_cast<VkDeviceSize>(dataSize), 0, &pData));
+    memcpy(pData, data, static_cast<VkDeviceSize>(dataSize));
+    vkUnmapMemory(device, bufferMemory);
+
+    return std::make_tuple(buffer, bufferMemory);
+}
+
 
 std::tuple<VkBuffer, VkDeviceMemory, int, int> LoadImageIntoHostCoherentMemory(const VkPhysicalDevice & physicalDevice, const VkDevice & device, const std::string & pathToImageFile)
 {
@@ -172,7 +188,6 @@ std::tuple<VkBuffer, VkDeviceMemory, int, int> LoadImageIntoHostCoherentMemory(c
 
     return std::make_tuple(buffer, bufferMemory, width, height);
 }
-
 void FreeMemory(const VkDevice & device, const VkDeviceMemory& memory)
 {
     vkFreeMemory(device, memory, nullptr);
@@ -334,6 +349,7 @@ VkImageView CreateImageView(const VkDevice & device, const VkPhysicalDevice & ph
     createInfo.viewType = VkImageViewType::VK_IMAGE_VIEW_TYPE_2D;
     createInfo.format = format;
     createInfo.subresourceRange = { imageAspectFlags, 0u, 1u, 0u, 1u };
+    createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 
     VkImageView view = VK_NULL_HANDLE;
     ErrorCheck(vkCreateImageView(device, &createInfo, nullptr, &view));

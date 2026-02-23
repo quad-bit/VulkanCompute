@@ -528,7 +528,7 @@ GraphicsTask::GraphicsTask(const VkDevice& device, const VkPhysicalDevice& physi
 
     // Load texture
     {
-        std::string imagePath = std::string{ ASSETS_PATH } +"Textures/lakers.jpg";
+        std::string imagePath = std::string{ ASSETS_PATH } +"textures/lakers.jpg";
         auto [ pixelBuffer, pixelMemory, width, height] = LoadImageIntoHostCoherentMemory(physicalDevice,
             device, imagePath);
 
@@ -736,4 +736,9 @@ void GraphicsTask::Update(const uint64_t & frameIndex, const uint32_t & frameInF
 const std::vector<VkImage>& GraphicsTask::GetColorAttachments()
 {
     return m_colorAttachments;
+}
+
+const std::vector<VkImageView>& GraphicsTask::GetColorAttachmentViews() const
+{
+    return m_colorAttachmentViews;
 }

@@ -70,4 +70,5 @@ public:
     void Update(const uint64_t& frameIndex, const uint32_t& frameInFlight,
         const VkSemaphore& timelineSem, uint64_t signalValue, uint64_t waitValue);
     const std::vector<VkImage>& GetColorAttachments();
+    const std::vector<VkImageView>& GetColorAttachmentViews() const;
 };

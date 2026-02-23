@@ -45,6 +45,13 @@ VkDeviceMemory AllocateHostCoherentMemory(
     const VkMemoryRequirements& memoryRequirements
 );
 
+std::tuple<VkBuffer, VkDeviceMemory> LoadImageDataIntoStagingBuffer(
+    const VkPhysicalDevice& physicalDevice,
+    const VkDevice& device,
+    const unsigned char* data, const size_t& dataSize
+);
+
+
 // Load an image from a file, and copy it into a newly created buffer (backed with memory already):
 // Returns a tuple with: <0> the buffer handle, <1> the memory handle, <2> width, <3> height
 std::tuple<VkBuffer, VkDeviceMemory, int, int> LoadImageIntoHostCoherentMemory(
@@ -138,8 +145,9 @@ enum TimelineStages
     UNINITIALIZED = 0,
     COMPUTE_FINISHED = 1,
     GRAPHICS_FINISHED = 2,
-    SAFE_TO_PRESENT = 3,
-    NUM_STAGES = 4
+    GUI_FINISHED = 3,
+    SAFE_TO_PRESENT = 4,
+    NUM_STAGES = 5
 };
 
 class TimelineSemaphore

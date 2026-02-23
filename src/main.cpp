@@ -3,6 +3,7 @@
 #include "ComputeTask.h"
 #include <optional>
 #include "Timer.h"
+#include "ImguiUtil.h"
 
 struct SharedResources
 {
@@ -78,6 +79,38 @@ int main()
         timelineSemaphores.emplace_back(std::make_unique<TimelineSemaphore>(vulkanManager->GetLogicalDevice()));
     }
 
+    // imgui
+    std::unique_ptr<ImguiUtil > imguiUtil = std::make_unique<ImguiUtil > (windowManagerObj->glfwWindow, vulkanManager->GetLogicalDevice(), vulkanManager->GetPhysicalDevice(),
+        vulkanManager->GetGraphicsQueue(), vulkanManager->GetQueueFamilyIndex(), vulkanManager->GetMaxFramesInFlight(),
+        screenWidth, screenHeight, vulkanManager->GetDepthFormat(), VK_FORMAT_B8G8R8A8_UNORM, pGraphicsTask->GetColorAttachmentViews());
+    imguiUtil->Init();
+
+    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+    auto drawFunc = [&clear_color]()
+    {
+        static float f = 0.0f;
+        static int counter = 0;
+        static bool showWindow = false;
+
+        ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
+
+        ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
+        //ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
+        ImGui::Checkbox("Another Window", &showWindow);
+
+        ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
+        ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
+
+        if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
+            counter++;
+        ImGui::SameLine();
+        ImGui::Text("counter = %d", counter);
+
+        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f);
+        ImGui::End();
+    };
+    imguiUtil->AddPersistentDrawCalls(drawFunc);
+
     uint64_t frameIndex = 0;
 
     //timer.Sleep(10);
@@ -87,6 +120,9 @@ int main()
         timer.StartFrame();
 
         auto currentFrameInFlight = vulkanManager->GetFrameInFlightIndex();
+
+        imguiUtil->NewFrame();
+
         if (timelineSemaphores[currentFrameInFlight]->GetFrameIndex() > 0)
         {
             // wait for previous frame's (corresponding frameInFlight) presentation to complete
@@ -116,11 +152,21 @@ int main()
             pGraphicsTask->Update(frameIndex, currentFrameInFlight, timelineSemaphores[currentFrameInFlight]->GetSemaphore(), signalValue, waitValue);
         }
 
+        // Trigger imgui
+        {
+            uint64_t signalValue = timelineSemaphores[currentFrameInFlight]->GetTimelineValue(TimelineStages::GUI_FINISHED);
+            uint64_t waitValue = timelineSemaphores[currentFrameInFlight]->GetTimelineValue(TimelineStages::GRAPHICS_FINISHED);
+            imguiUtil->Render(currentFrameInFlight, timelineSemaphores[currentFrameInFlight]->GetSemaphore(), signalValue, waitValue);
+        }
+
         // Get the active swapchain index
         uint32_t activeSwapchainImageindex = vulkanManager->GetActiveSwapchainImageIndex(swapchainImageAcquiredSemaphores[currentFrameInFlight]);
 
         // End the frame (increments index counters)
-        vulkanManager->CopyAndPresent(pGraphicsTask->GetColorAttachments()[currentFrameInFlight], *timelineSemaphores[currentFrameInFlight], swapchainImageAcquiredSemaphores[currentFrameInFlight]);
+        {
+            uint64_t waitValue = timelineSemaphores[currentFrameInFlight]->GetTimelineValue(TimelineStages::GUI_FINISHED);
+            vulkanManager->CopyAndPresent(pGraphicsTask->GetColorAttachments()[currentFrameInFlight], *timelineSemaphores[currentFrameInFlight], swapchainImageAcquiredSemaphores[currentFrameInFlight], waitValue);
+        }
 
         frameIndex++;
         timelineSemaphores[currentFrameInFlight]->IncrementFrameIndex();
@@ -148,6 +194,10 @@ int main()
 
         pComputeTask.reset();
         pComputeTask = nullptr;
+
+        imguiUtil->Cleanup();
+        imguiUtil.reset();
+        imguiUtil = nullptr;
     }
 
     vulkanManager->DeInit();
