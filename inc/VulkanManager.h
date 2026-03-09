@@ -69,6 +69,7 @@ public:
     const VkQueue& GetGraphicsQueue() const;
     const VkFormat& GetDepthFormat() const;
 
-    void CopyAndPresent(const VkImage& srcImage, TimelineSemaphore& semaphore, const VkSemaphore& imageAcquiredSemaphore, uint64_t waitValue);
+    void CopyAndPresent(const VkImage& srcImage, const VkSemaphore& semaphore, const VkSemaphore& imageAcquiredSemaphore,
+        uint64_t waitValue, uint64_t signalValue);
     bool AreTheQueuesIdle();
 };

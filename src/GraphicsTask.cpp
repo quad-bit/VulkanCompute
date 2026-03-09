@@ -154,7 +154,6 @@ GraphicsTask::GraphicsTask(const VkDevice& device, const VkPhysicalDevice& physi
 
     VkDescriptorSetLayout layouts[3]{ m_viewSetLayout, m_transformSetLayout, m_samplerLayout };
 
-
     VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
     pipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
     pipelineLayoutCreateInfo.pSetLayouts = layouts;

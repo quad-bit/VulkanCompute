@@ -5,8 +5,8 @@
 #include <ImguiGlfwHelper.h>
 
 
-GLFWwindow*  ImguiUtil::m_mouseWindow = nullptr;
-ImVec2       ImguiUtil::m_lastValidMousePos = ImVec2(0,0);
+GLFWwindow*  Common::ImguiUtil::m_mouseWindow = nullptr;
+ImVec2       Common::ImguiUtil::m_lastValidMousePos = ImVec2(0,0);
 
 namespace 
 {
@@ -117,7 +117,7 @@ namespace
 
 };
 
-ImguiUtil::ImguiUtil(GLFWwindow* glfwWindow, const VkDevice& device, const VkPhysicalDevice& physicalDevice, const VkQueue& graphicsQueue,
+Common::ImguiUtil::ImguiUtil(GLFWwindow* glfwWindow, const VkDevice& device, const VkPhysicalDevice& physicalDevice, const VkQueue& graphicsQueue,
     uint32_t graphicsQueueFamily, uint8_t frameInFlights, uint32_t frameBufferWidth, uint32_t framebufferHeight, VkFormat depthFormat, 
     VkFormat colorFormat, const std::vector<VkImageView>& colorViews):
     m_glfwWindow(glfwWindow), cm_device(device), cm_physicalDevice(physicalDevice), cm_graphicsQueue(graphicsQueue), m_graphicsQueueFamily(graphicsQueueFamily),
@@ -189,11 +189,11 @@ ImguiUtil::ImguiUtil(GLFWwindow* glfwWindow, const VkDevice& device, const VkPhy
     }
 }
 
-ImguiUtil::~ImguiUtil()
+Common::ImguiUtil::~ImguiUtil()
 {
 }
 
-void ImguiUtil::Init()
+void Common::ImguiUtil::Init()
 {
     if (m_initialized)
     {
@@ -220,7 +220,7 @@ void ImguiUtil::Init()
     m_initialized = true;
 }
 
-void ImguiUtil::InitResources()
+void Common::ImguiUtil::InitResources()
 {
     CreateFontTexture();
     CreateDescriptorSetLayout();
@@ -230,11 +230,11 @@ void ImguiUtil::InitResources()
     CreatePipeline();
 }
 
-void ImguiUtil::SetStyle(uint32_t index)
+void Common::ImguiUtil::SetStyle(uint32_t index)
 {
 }
 
-void ImguiUtil::Cleanup()
+void Common::ImguiUtil::Cleanup()
 {
     if (!m_initialized)
     {
@@ -281,12 +281,12 @@ void ImguiUtil::Cleanup()
     m_initialized = false;
 }
 
-void ImguiUtil::AddPersistentDrawCalls(const std::function<void()>& func)
+void Common::ImguiUtil::AddPersistentDrawCalls(const std::function<void()>& func) const
 {
     m_guiDrawPersistentList.push_back(func);
 }
 
-void ImguiUtil::NewFrame()
+void Common::ImguiUtil::NewFrame()
 {
     if (!m_initialized)
     {
@@ -305,7 +305,7 @@ void ImguiUtil::NewFrame()
 }
 
 
-void ImguiUtil::Render(uint32_t frameInFlight, const VkSemaphore& timelineSem, uint64_t signalValue, uint64_t waitValue)
+void Common::ImguiUtil::Render(uint32_t frameInFlight, const VkSemaphore& timelineSem, uint64_t signalValue, uint64_t waitValue)
 {
     if (!m_initialized)
     {
@@ -450,14 +450,14 @@ void ImguiUtil::Render(uint32_t frameInFlight, const VkSemaphore& timelineSem, u
 
 }
 
-void ImguiUtil::ScrollCallback(GLFWwindow* window, double xoffset, double yoffset)
+void Common::ImguiUtil::ScrollCallback(GLFWwindow* window, double xoffset, double yoffset)
 {
     //ImGuiIO& io = ImGui::GetIO(bd->Context);
     ImGuiIO& io = ImGui::GetIO();
     io.AddMouseWheelEvent((float)xoffset, (float)yoffset);
 }
 
-void ImguiUtil::KeyCallback(GLFWwindow* window, int keycode, int scancode, int action, int mods)
+void Common::ImguiUtil::KeyCallback(GLFWwindow* window, int keycode, int scancode, int action, int mods)
 {
     if (action != GLFW_PRESS && action != GLFW_RELEASE)
         return;
@@ -473,13 +473,13 @@ void ImguiUtil::KeyCallback(GLFWwindow* window, int keycode, int scancode, int a
     io.SetKeyEventNativeData(imgui_key, keycode, scancode); // To support legacy indexing (<1.87 user code)
 }
 
-void ImguiUtil::WindowFocusCallback(GLFWwindow* window, int focused)
+void Common::ImguiUtil::WindowFocusCallback(GLFWwindow* window, int focused)
 {
     ImGuiIO& io = ImGui::GetIO();
     io.AddFocusEvent(focused != 0);
 }
 
-void ImguiUtil::CursorPosCallback(GLFWwindow* window, double x, double y)
+void Common::ImguiUtil::CursorPosCallback(GLFWwindow* window, double x, double y)
 {
     //ImGuiIO& io = ImGui::GetIO(bd->Context);
     ImGuiIO& io = ImGui::GetIO();
@@ -487,7 +487,7 @@ void ImguiUtil::CursorPosCallback(GLFWwindow* window, double x, double y)
     m_lastValidMousePos = ImVec2((float)x, (float)y);
 }
 
-void ImguiUtil::CursorEnterCallback(GLFWwindow* window, int entered)
+void Common::ImguiUtil::CursorEnterCallback(GLFWwindow* window, int entered)
 {
     ImGuiIO& io = ImGui::GetIO();
     if (entered)
@@ -503,13 +503,13 @@ void ImguiUtil::CursorEnterCallback(GLFWwindow* window, int entered)
     }
 }
 
-void ImguiUtil::CharCallback(GLFWwindow* window, unsigned int c)
+void Common::ImguiUtil::CharCallback(GLFWwindow* window, unsigned int c)
 {
     ImGuiIO& io = ImGui::GetIO();
     io.AddInputCharacter(c);
 }
 
-void ImguiUtil::MouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
+void Common::ImguiUtil::MouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
 {
     ImGuiIO& io = ImGui::GetIO();
     UpdateKeyModifiers(io, window);
@@ -517,7 +517,7 @@ void ImguiUtil::MouseButtonCallback(GLFWwindow* window, int button, int action, 
         io.AddMouseButtonEvent(button, action == GLFW_PRESS);
 }
 
-void ImguiUtil::UpdateBuffers(uint32_t frameInFlight)
+void Common::ImguiUtil::UpdateBuffers(uint32_t frameInFlight)
 {
     ImDrawData* drawData = ImGui::GetDrawData();
     if (!drawData || drawData->CmdListsCount == 0)
@@ -587,7 +587,7 @@ void ImguiUtil::UpdateBuffers(uint32_t frameInFlight)
     }
 }
 
-void ImguiUtil::HandleMouse(float x, float y, uint32_t buttons)
+void Common::ImguiUtil::HandleMouse(float x, float y, uint32_t buttons)
 {
     if (!m_initialized) {
         return;
@@ -604,7 +604,7 @@ void ImguiUtil::HandleMouse(float x, float y, uint32_t buttons)
     io.MouseDown[2] = (buttons & 0x04) != 0; // Middle button
 }
 
-void ImguiUtil::HandleKeyboard(uint32_t key, bool pressed)
+void Common::ImguiUtil::HandleKeyboard(uint32_t key, bool pressed)
 {
     if (!m_initialized) {
         return;
@@ -625,7 +625,7 @@ void ImguiUtil::HandleKeyboard(uint32_t key, bool pressed)
     //io.KeySuper = io.KeysDown[343] || io.KeysDown[347]; // Left/Right Super
 }
 
-void ImguiUtil::HandleChar(uint32_t c)
+void Common::ImguiUtil::HandleChar(uint32_t c)
 {
     if (!m_initialized) {
         return;
@@ -635,7 +635,7 @@ void ImguiUtil::HandleChar(uint32_t c)
     io.AddInputCharacter(c);
 }
 
-void ImguiUtil::HandleResize(uint32_t width, uint32_t height)
+void Common::ImguiUtil::HandleResize(uint32_t width, uint32_t height)
 {
     if (!m_initialized) {
         return;
@@ -648,7 +648,7 @@ void ImguiUtil::HandleResize(uint32_t width, uint32_t height)
     io.DisplaySize = ImVec2(static_cast<float>(width), static_cast<float>(height));
 }
 
-bool ImguiUtil::WantCaptureKeyboard() const
+bool Common::ImguiUtil::WantCaptureKeyboard() const
 {
     if (!m_initialized) {
         return false;
@@ -657,7 +657,7 @@ bool ImguiUtil::WantCaptureKeyboard() const
     return ImGui::GetIO().WantCaptureKeyboard;
 }
 
-bool ImguiUtil::WantCaptureMouse() const
+bool Common::ImguiUtil::WantCaptureMouse() const
 {
     if (!m_initialized) {
         return false;
@@ -666,7 +666,7 @@ bool ImguiUtil::WantCaptureMouse() const
     return ImGui::GetIO().WantCaptureMouse;
 }
 
-void ImguiUtil::CreateFontTexture()
+void Common::ImguiUtil::CreateFontTexture()
 {
     ImGuiIO& io = ImGui::GetIO();
     unsigned char* fontData;
@@ -762,7 +762,7 @@ void ImguiUtil::CreateFontTexture()
     ErrorCheck(vkCreateSampler(cm_device, &samplerInfo, nullptr, &m_sampler));
 }
 
-void ImguiUtil::CreateDescriptorSetLayout()
+void Common::ImguiUtil::CreateDescriptorSetLayout()
 {
     VkDescriptorSetLayoutBinding binding{};
     binding.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -778,7 +778,7 @@ void ImguiUtil::CreateDescriptorSetLayout()
     ErrorCheck(vkCreateDescriptorSetLayout(cm_device, &layoutInfo, nullptr, &m_descriptorSetLayout));
 }
 
-void ImguiUtil::CreateDescriptorPool()
+void Common::ImguiUtil::CreateDescriptorPool()
 {
     VkDescriptorPoolSize poolSize{};
     poolSize.type = VkDescriptorType::VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -794,7 +794,7 @@ void ImguiUtil::CreateDescriptorPool()
     ErrorCheck(vkCreateDescriptorPool(cm_device, &poolInfo, nullptr, &m_descriptorPool));
 }
 
-void ImguiUtil::CreateDescriptorSet()
+void Common::ImguiUtil::CreateDescriptorSet()
 {
     VkDescriptorSetAllocateInfo allocInfo{};
     allocInfo.descriptorPool = m_descriptorPool;
@@ -821,7 +821,7 @@ void ImguiUtil::CreateDescriptorSet()
     vkUpdateDescriptorSets(cm_device, 1, &writeSet, 0, nullptr);
 }
 
-void ImguiUtil::CreatePiplelineLayout()
+void Common::ImguiUtil::CreatePiplelineLayout()
 {
     VkPushConstantRange pushConstantRange;
     pushConstantRange.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_VERTEX_BIT;
@@ -839,7 +839,7 @@ void ImguiUtil::CreatePiplelineLayout()
     ErrorCheck(vkCreatePipelineLayout(cm_device, &pipelineLayoutInfo, nullptr, &m_pipelineLayout));
 }
 
-void ImguiUtil::CreatePipeline()
+void Common::ImguiUtil::CreatePipeline()
 {
     VkShaderModuleCreateInfo vertexShaderModuleInfo = {};
     vertexShaderModuleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;

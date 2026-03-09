@@ -484,3 +484,118 @@ void ChangeImageLayout(const VkDevice& device, std::vector<VkImage>& imageList, 
     vkDestroyFence(device, fence, nullptr);
     vkDestroyCommandPool(device, pool, nullptr);
 }
+
+std::tuple<VkBuffer, VkDeviceMemory> CreateStagingBuffer(uint32_t dataSize, const VkPhysicalDevice& physicalDevice, const VkDevice& device)
+{
+    auto alignedSize = GetMemoryAlignedDataSizeForBuffer(physicalDevice, dataSize);
+
+    VkBuffer buffer = VK_NULL_HANDLE;
+    VkDeviceMemory memory = VK_NULL_HANDLE;
+
+    VkBufferCreateInfo info{};
+    info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    info.size = alignedSize;
+    info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    ErrorCheck(vkCreateBuffer(device, &info, nullptr, &buffer));
+
+    // Get memory types supported by the physical device:
+    VkPhysicalDeviceMemoryProperties memoryProperties;
+    vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memoryProperties);
+
+    VkMemoryRequirements memoryRequirements;
+    vkGetBufferMemoryRequirements(device, buffer, &memoryRequirements);
+
+    std::optional<uint32_t> memIndex;
+    // In search for a suitable memory type INDEX:
+    for (uint32_t i = 0u; i < memoryProperties.memoryTypeCount; ++i)
+    {
+        // Is this kind of memory suitable for our buffer?
+        const auto bitmask = memoryRequirements.memoryTypeBits;
+        const auto bit = 1 << i;
+        if (0 == (bitmask & bit))
+        {
+            continue; // => nope
+        }
+
+        // Does this kind of memory support our usage requirements?
+        if ((memoryProperties.memoryTypes[i].propertyFlags & (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
+            != VkMemoryPropertyFlags{})
+        {
+            // Return the INDEX of a suitable memory type
+            memIndex = i;
+            break;
+        }
+    }
+
+    assert(memIndex.has_value() == true);
+
+    VkMemoryAllocateInfo memoryAllocInfo = {};
+    memoryAllocInfo.allocationSize = std::max(alignedSize, memoryRequirements.size);
+    memoryAllocInfo.memoryTypeIndex = memIndex.value();
+    memoryAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+
+    ErrorCheck(vkAllocateMemory(device, &memoryAllocInfo, nullptr, &memory));
+    ErrorCheck(vkBindBufferMemory(device, buffer, memory, 0));
+
+    return std::tuple<VkBuffer, VkDeviceMemory>(buffer, memory);
+}
+
+void CopyFromStagingBuffer(const VkBuffer& stagingBuffer, const VkBuffer& targetBuffer,
+    uint32_t dataSize, const VkDevice& device, const VkQueue& queue, uint32_t queueFamilyIndex)
+{
+    VkCommandPool pool = VK_NULL_HANDLE;
+    VkCommandPoolCreateInfo info{};
+    info.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+    info.pNext = nullptr;
+    info.queueFamilyIndex = queueFamilyIndex;
+    info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+
+    ErrorCheck(vkCreateCommandPool(device, &info, nullptr, &pool));
+
+    VkCommandBufferAllocateInfo allocInfo{};
+    allocInfo.commandBufferCount = 1;
+    allocInfo.commandPool = pool;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.pNext = nullptr;
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+
+    VkCommandBuffer cmdBuffer = VK_NULL_HANDLE;
+    ErrorCheck(vkAllocateCommandBuffers(device, &allocInfo, &cmdBuffer));
+
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    beginInfo.pInheritanceInfo = nullptr;
+    beginInfo.pNext = nullptr;
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+    vkBeginCommandBuffer(cmdBuffer, &beginInfo);
+    {
+        VkBufferCopy copyRegion = {};
+        copyRegion.srcOffset = 0; // start at beginning of source
+        copyRegion.dstOffset = 0; // start at beginning of destination
+        copyRegion.size = dataSize; // number of bytes to copy
+
+        // Record into a command buffer
+        vkCmdCopyBuffer(cmdBuffer, stagingBuffer, targetBuffer, 1, &copyRegion);
+    }
+    vkEndCommandBuffer(cmdBuffer);
+
+    VkFence fence = VK_NULL_HANDLE;
+    VkFenceCreateInfo fenceInfo{};
+    fenceInfo.pNext = nullptr;
+    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    ErrorCheck(vkCreateFence(device, &fenceInfo, nullptr, &fence));
+
+    VkSubmitInfo submitInfo{};
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &cmdBuffer;
+    submitInfo.pNext = nullptr;
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    ErrorCheck(vkQueueSubmit(queue, 1, &submitInfo, fence));
+
+    ErrorCheck(vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX));
+
+    vkDestroyFence(device, fence, nullptr);
+    vkDestroyCommandPool(device, pool, nullptr);
+}

@@ -5,7 +5,7 @@ set(TARGET_NAME "VulkanPlayground")
 
 project (${TARGET_NAME})
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
@@ -19,6 +19,12 @@ find_package(glm REQUIRED)
 find_package(glfw3 3.3 REQUIRED)
 find_package(imgui REQUIRED)
 find_package(Stb REQUIRED)
+find_package(Taskflow REQUIRED)
+
+FIND_PATH(TINYGLTF_INCLUDE_DIRS "tiny_gltf.h")
+if(TINYGLTF_INCLUDE_DIRS STREQUAL "")
+    message(FATAL_ERROR "Tiny not found")
+endif()
 
 set(CORE_FILES
     inc/VulkanManager.h
@@ -33,6 +39,14 @@ set(CORE_FILES
     inc/Timer.h
     inc/ImguiUtil.h
     inc/ImguiGlfwHelper.h
+    inc/GltfLoader.h
+    inc/SceneNode.h
+    inc/SceneManager.h
+    inc/Mesh.h
+    inc/ImguiEditor.h
+    inc/TimelineSemaphore.h
+    inc/WireFrameTask.h
+    inc/CameraUpdated.h
 
     src/VulkanManager.cpp
     src/ValidationManager.cpp
@@ -43,6 +57,12 @@ set(CORE_FILES
     src/Camera.cpp
     src/Transform.cpp
     src/ImguiUtil.cpp
+    src/GltfLoader.cpp
+    src/SceneNode.cpp
+    src/SceneManager.cpp
+    src/ImguiEditor.cpp
+    src/WireFrameTask.cpp
+    src/CameraUpdated.cpp
 
     src/main.cpp
 )
@@ -53,6 +73,9 @@ target_include_directories(${TARGET_NAME}
     PUBLIC
         $<INSTALL_INTERFACE:inc>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/inc>
+    PRIVATE
+        ${TINYGLTF_INCLUDE_DIRS}
+        ${Stb_INCLUDE_DIR}
 )
 
 target_compile_definitions(${TARGET_NAME} PUBLIC
@@ -61,8 +84,8 @@ target_compile_definitions(${TARGET_NAME} PUBLIC
     GLFW_ENABLED
 )
 
-target_include_directories(${TARGET_NAME} PRIVATE ${Stb_INCLUDE_DIR})
-target_link_libraries(${TARGET_NAME} PUBLIC Vulkan::Vulkan glfw glm::glm imgui::imgui)
+# target_include_directories(${TARGET_NAME} PRIVATE ${Stb_INCLUDE_DIR})
+target_link_libraries(${TARGET_NAME} PUBLIC Vulkan::Vulkan glfw glm::glm imgui::imgui Taskflow::Taskflow)
 
 add_custom_target(
     GeneratShaderBinaries
@@ -72,6 +95,10 @@ add_custom_target(
 add_custom_command(
     TARGET GeneratShaderBinaries
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/Spvs
+
+    COMMAND glslangvalidator -V ${ASSETS_PATH}/shaders/UnlitColor.vert -o ${CMAKE_BINARY_DIR}/Spvs/UnlitColorVert.spv
+    COMMAND glslangvalidator -V ${ASSETS_PATH}/shaders/UnlitColor.frag -o ${CMAKE_BINARY_DIR}/Spvs/UnlitColorFrag.spv
+
     COMMAND glslangvalidator -V ${ASSETS_PATH}/shaders/ClothSim.comp -o ${CMAKE_BINARY_DIR}/Spvs/ClothSim.spv
     COMMAND glslangvalidator -V ${ASSETS_PATH}/shaders/UnlitTextured.vert -o ${CMAKE_BINARY_DIR}/Spvs/UnlitTexturedVert.spv
     COMMAND glslangvalidator -V ${ASSETS_PATH}/shaders/UnlitTextured.frag -o ${CMAKE_BINARY_DIR}/Spvs/UnlitTexturedFrag.spv

@@ -1,9 +1,21 @@
 #include "VulkanManager.h"
 #include "GraphicsTask.h"
 #include "ComputeTask.h"
+#include "WireFrameTask.h"
 #include <optional>
 #include "Timer.h"
+#include "TimelineSemaphore.h"
+
 #include "ImguiUtil.h"
+#include "ImguiEditor.h"
+
+#include <taskflow/taskflow.hpp>
+#include "GltfLoader.h"
+#include "SceneManager.h"
+
+#include <plog/Initializers/RollingFileInitializer.h>
+#include <plog/Formatters/TxtFormatter.h>
+#include <plog/Appenders/ColorConsoleAppender.h>
 
 struct SharedResources
 {
@@ -35,11 +47,34 @@ struct SharedResources
 
 int main()
 {
+
+    static plog::ColorConsoleAppender<plog::TxtFormatter> consoleAppender;
+    plog::init(plog::verbose, &consoleAppender);
+
+    //tf::Executor executor;
+    //tf::Taskflow taskflow;
+
+    //auto [A, B, C, D] = taskflow.emplace(  // create four tasks
+    //    []() { std::cout << "TaskA\n"; },
+    //    []() { std::cout << "TaskB\n"; },
+    //    []() { std::cout << "TaskC\n"; },
+    //    []() { std::cout << "TaskD\n"; }
+    //);
+
+    //A.precede(B, C);  // A runs before B and C
+    //D.succeed(B, C);  // D runs after  B and C
+
+    //executor.run(taskflow).wait();
+
+    auto path = "E:/Work/WorkingCopies/glTF-Sample-Assets/Models/ABeautifulGame/glTF/ABeautifulGame.gltf";
+    //auto path = std::string{ ASSETS_PATH } + "models/Suzanne/Suzanne.gltf";
+    Common::SceneManager sceneManager{path};
+
+    //Common::LoadGltf(path, sceneManager);
+    //Loader::LoadGltf(std::string{ ASSETS_PATH } + "models/Suzanne/Suzanne.gltf", sceneManager);
+
     constexpr uint32_t screenWidth = 1024;
     constexpr uint32_t screenHeight = 1024;
-
-    //constexpr uint32_t imageWidth = 1024;
-    //constexpr uint32_t imageHeight = 1024;
 
     Timer timer(60);
 
@@ -48,6 +83,9 @@ int main()
 
     std::unique_ptr<VulkanManager> vulkanManager = std::make_unique<VulkanManager>(screenWidth, screenHeight);
     vulkanManager->Init(windowManagerObj->glfwWindow);
+
+    sceneManager.Initialise(vulkanManager->GetLogicalDevice(), vulkanManager->GetPhysicalDevice(), vulkanManager->GetGraphicsQueue(),
+        vulkanManager->GetQueueFamilyIndex());
 
     uint32_t maxFramesInFlight = vulkanManager->GetMaxFramesInFlight();
 
@@ -61,6 +99,11 @@ int main()
 
     std::unique_ptr<ComputeTask> pComputeTask = std::make_unique<ComputeTask>(vulkanManager->GetQueueFamilyIndex(),
         vulkanManager->GetLogicalDevice(), vulkanManager->GetPhysicalDevice(), vulkanManager->GetComputeQueue(), pSharedResources->m_buffers, maxFramesInFlight);
+
+    std::unique_ptr<Common::WireFrameTask> pWireframeTask = std::make_unique<Common::WireFrameTask>(
+        vulkanManager->GetLogicalDevice(), vulkanManager->GetPhysicalDevice(), vulkanManager->GetGraphicsQueue(),
+        vulkanManager->GetQueueFamilyIndex(), vulkanManager->GetMaxFramesInFlight(),
+        screenWidth, screenHeight, vulkanManager->GetDepthFormat());
 
     std::vector<VkSemaphore> swapchainImageAcquiredSemaphores;
     for (uint32_t i = 0; i < maxFramesInFlight; i++)
@@ -80,36 +123,13 @@ int main()
     }
 
     // imgui
-    std::unique_ptr<ImguiUtil > imguiUtil = std::make_unique<ImguiUtil > (windowManagerObj->glfwWindow, vulkanManager->GetLogicalDevice(), vulkanManager->GetPhysicalDevice(),
+    std::unique_ptr<Common::ImguiUtil > imguiUtil = std::make_unique<Common::ImguiUtil >(
+        windowManagerObj->glfwWindow, vulkanManager->GetLogicalDevice(), vulkanManager->GetPhysicalDevice(),
         vulkanManager->GetGraphicsQueue(), vulkanManager->GetQueueFamilyIndex(), vulkanManager->GetMaxFramesInFlight(),
         screenWidth, screenHeight, vulkanManager->GetDepthFormat(), VK_FORMAT_B8G8R8A8_UNORM, pGraphicsTask->GetColorAttachmentViews());
     imguiUtil->Init();
 
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-    auto drawFunc = [&clear_color]()
-    {
-        static float f = 0.0f;
-        static int counter = 0;
-        static bool showWindow = false;
-
-        ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
-
-        ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
-        //ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
-        ImGui::Checkbox("Another Window", &showWindow);
-
-        ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-        ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
-
-        if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-            counter++;
-        ImGui::SameLine();
-        ImGui::Text("counter = %d", counter);
-
-        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f);
-        ImGui::End();
-    };
-    imguiUtil->AddPersistentDrawCalls(drawFunc);
+    Common::ImguiEditor editorObj(*imguiUtil.get(), sceneManager);
 
     uint64_t frameIndex = 0;
 
@@ -165,7 +185,9 @@ int main()
         // End the frame (increments index counters)
         {
             uint64_t waitValue = timelineSemaphores[currentFrameInFlight]->GetTimelineValue(TimelineStages::GUI_FINISHED);
-            vulkanManager->CopyAndPresent(pGraphicsTask->GetColorAttachments()[currentFrameInFlight], *timelineSemaphores[currentFrameInFlight], swapchainImageAcquiredSemaphores[currentFrameInFlight], waitValue);
+            uint64_t signalValue = timelineSemaphores[currentFrameInFlight]->GetTimelineValue(TimelineStages::SAFE_TO_PRESENT);
+            vulkanManager->CopyAndPresent(pGraphicsTask->GetColorAttachments()[currentFrameInFlight], timelineSemaphores[currentFrameInFlight]->GetSemaphore(),
+                swapchainImageAcquiredSemaphores[currentFrameInFlight], waitValue, signalValue);
         }
 
         frameIndex++;
@@ -186,6 +208,9 @@ int main()
             sem.reset();
         timelineSemaphores.clear();
 
+        pWireframeTask.reset();
+        pWireframeTask = nullptr;
+
         pSharedResources.reset();
         pSharedResources = nullptr;
 
@@ -194,6 +219,8 @@ int main()
 
         pComputeTask.reset();
         pComputeTask = nullptr;
+
+        sceneManager.DeInitialise();
 
         imguiUtil->Cleanup();
         imguiUtil.reset();
